@@ -5,6 +5,6 @@
   "main": "db/schema.ts",
   "types": "db/schema.ts",
   "dependencies": {
-    "drizzle-orm": "^0.32.2"   
+    "drizzle-orm": "^0.44.6"
   }
 }

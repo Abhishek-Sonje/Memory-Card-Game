@@ -9,25 +9,25 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "next": "15.0.4",
-    "next-auth": "^5.0.0-beta.29",
-    "react": "19.0.0",
-    "react-dom": "19.0.0",
-    "socket.io-client": "^4.8.1",
-    "@auth/drizzle-adapter": "^1.0.0",
-    "drizzle-orm": "^0.32.2",
-    "@neondatabase/serverless": "^0.10.2",
-    "@memory-game/shared": "workspace:*"
+    "@auth/drizzle-adapter": "^1.11.0",
+    "@memory-game/shared": "workspace:*",
+    "@neondatabase/serverless": "^1.0.2",
+    "drizzle-orm": "^0.44.6",
+    "next": "15.5.6",
+    "next-auth": "5.0.0-beta.29",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "socket.io-client": "^4.8.1"
   },
   "devDependencies": {
-    "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "15.0.4",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "@eslint/eslintrc": "^3.3.1",
+    "@tailwindcss/postcss": "^4.1.14",
+    "@types/node": "^24.8.1",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "eslint": "^9.38.0",
+    "eslint-config-next": "15.5.6",
+    "tailwindcss": "^4.1.14",
+    "typescript": "^5.9.3"
   }
 }

@@ -11,11 +11,11 @@
   },
   "dependencies": {
     "@memory-game/shared": "workspace:*",
-    "@neondatabase/serverless": "^0.10.2",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2",
+    "@neondatabase/serverless": "^1.0.2",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
     "jsonwebtoken": "^9.0.2",
-    "pg": "^8.12.3",
+    "pg": "^8.16.3",
     "socket.io": "^4.8.1"
   },
   "devDependencies": {
@@ -23,6 +23,6 @@
     "drizzle-kit": "^0.31.5",
     "drizzle-orm": "^0.44.6",
     "ts-node-dev": "^2.0.0",
-    "typescript": "^5"
+    "typescript": "^5.9.3"
   }
 }
