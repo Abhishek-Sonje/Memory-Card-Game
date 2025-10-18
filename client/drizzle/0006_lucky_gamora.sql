@@ -1,0 +1,1 @@
+ALTER TABLE "games" ADD COLUMN "room_id" varchar NOT NULL;

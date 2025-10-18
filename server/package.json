@@ -1,0 +1,28 @@
+{
+  "name": "@memory-game/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch --loader ts-node/esm src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "migrate": "drizzle-kit generate && drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@memory-game/shared": "workspace:*",
+    "@neondatabase/serverless": "^0.10.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.12.3",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.10",
+    "drizzle-kit": "^0.31.5",
+    "drizzle-orm": "^0.44.6",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5"
+  }
+}

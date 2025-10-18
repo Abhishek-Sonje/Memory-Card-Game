@@ -1,0 +1,10 @@
+{
+  "name": "@memory-game/shared",
+  "type": "module",
+  "version": "1.0.0",
+  "main": "db/schema.ts",
+  "types": "db/schema.ts",
+  "dependencies": {
+    "drizzle-orm": "^0.32.2"   
+  }
+}

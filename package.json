@@ -1,0 +1,14 @@
+{
+  "name": "memory-game-monorepo",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --parallel run dev",
+    "build": "pnpm --recursive run build",
+    "start": "pnpm --recursive run start",
+    "migrate": "pnpm --filter @memory-game/server run migrate"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}
