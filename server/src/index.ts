@@ -3,16 +3,35 @@ import type { Request, Response } from "express";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import jwt from "jsonwebtoken";
+
 import { db } from "./lib/db.ts";
 import { games, leaderboard, moves, players } from "@memory-game/shared";
 import { and, eq, sql } from "drizzle-orm";
 
 const app = express();
+
+// Enable CORS for all routes
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', 'http://localhost:3000');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
+
 app.use(express.json());
 const server = createServer(app);
 
 const io = new Server(server, {
-  cors: { origin: "http://localhost:3002", credentials: true },
+  cors: { 
+    origin: ["http://localhost:3000", "http://localhost:3001"], 
+    credentials: true 
+  },
 });
 
 // Constants
@@ -23,24 +42,47 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // Middleware for Socket.IO authentication
 io.use((socket, next) => {
+  const token = socket.handshake.auth.token;
   const userId = socket.handshake.auth.userId;
-  if (!userId) {
+  
+  if (!token || !userId) {
     return next(new Error("Authentication required"));
   }
-  // TODO: Implement proper JWT verification here
-  // const token = socket.handshake.auth.token;
-  // try {
-  //   const decoded = jwt.verify(token, JWT_SECRET);
-  //   socket.data.userId = decoded.userId;
-  // } catch (error) {
-  //   return next(new Error("Invalid token"));
-  // }
-  socket.data.userId = userId;
-  next();
+  
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string };
+    if (decoded.userId !== userId) {
+      return next(new Error("Token user mismatch"));
+    }
+    socket.data.userId = decoded.userId;
+    next();
+  } catch (error) {
+    console.error("JWT verification failed:", error);
+    return next(new Error("Invalid token"));
+  }
 });
 
 app.get("/", (req: Request, res: Response) => {
-  res.send("<h1>Hello world</h1>");
+  res.send("<h1>Memory Game Server</h1>");
+});
+
+// Authentication endpoint to generate JWT tokens
+app.post("/api/auth/token", async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+
+    // Generate JWT token
+    const token = jwt.sign({ userId }, JWT_SECRET, { expiresIn: "24h" });
+    
+    res.json({ token, userId });
+  } catch (error) {
+    console.error("Error generating token:", error);
+    res.status(500).json({ error: "Failed to generate token" });
+  }
 });
 
 server.listen(3002, () => {
