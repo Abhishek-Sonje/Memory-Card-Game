@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.0",
+    "@gsap/react": "^2.1.2",
     "@memory-game/shared": "workspace:*",
     "@neondatabase/serverless": "^1.0.2",
     "class-variance-authority": "^0.7.1",
@@ -17,6 +18,7 @@
     "dotenv": "^17.2.3",
     "drizzle-orm": "^0.44.6",
     "framer-motion": "^12.23.24",
+    "gsap": "^3.13.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "next": "15.5.6",

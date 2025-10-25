@@ -7,7 +7,12 @@ const config: Config = {
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        "rubik-iso": ["var(--font-rubik-iso)"],
+        "zain": ["var(--font-zain)"],
+      },
+    },
   },
   plugins: [],
 };

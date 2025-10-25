@@ -1,8 +1,32 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
-import {ThemeProvider} from "next-themes"
+import { ThemeProvider } from "next-themes"
+import { Rubik_Iso,Zain ,Poppins} from "next/font/google";
 import "./globals.css";
+
+const rubikIso = Rubik_Iso({
+  subsets: ["latin"],
+  weight: "400", // Rubik Iso comes in 400 weight
+  variable: "--font-rubik-iso",
+  display: "swap",
+});
+
+const zain = Zain({
+  subsets: ["latin"],
+  adjustFontFallback: true,
+  weight: ["300", "400", "700", "800"], // Zain has multiple weights
+  variable: "--font-zain",
+  display: "swap",
+});
+
+const poppins = Poppins({
+  subsets: ["latin"],
+  adjustFontFallback: true,
+  weight: ["300", "400", "500", "600", "700", "800"], // Poppins has multiple weights
+  variable: "--font-poppins",
+  display: "swap",
+});
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -26,14 +50,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
-          <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-        <SessionProvider>
-            {children}
-        </SessionProvider>
-          </ThemeProvider>
+      <body className={`${rubikIso.variable} ${zain.variable} antialiased`}>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+          <SessionProvider>{children}</SessionProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
