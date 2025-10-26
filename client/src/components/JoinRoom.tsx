@@ -1,5 +1,7 @@
 "use client";
+
 import React, { useState } from "react";
+import { useSocket } from "../hooks/useSocket";
 import {
   Modal,
   ModalBody,
@@ -9,7 +11,8 @@ import {
 } from "./UI/animated-modal-button";
 import { motion } from "framer-motion";
 
-export default function   JoinRoomModal() {
+export default function JoinRoomModal() {
+  const { socket, isConnected, isAuthenticated } = useSocket();
   const [roomId, setRoomId] = useState("");
   const [isJoining, setIsJoining] = useState(false);
 
@@ -19,15 +22,19 @@ export default function   JoinRoomModal() {
       return;
     }
 
+      if (!socket || !isConnected) {
+        alert("Not connected to the server yet!");
+        return;
+      }
+
     setIsJoining(true);
 
     try {
       // Replace with your actual userId and socket instance
-      const userId = "your-user-id";
+      
 
       // TODO: Emit joinGame socket event
-      // socket.emit("joinGame", roomId.trim());
-
+      socket.emit("joinGame", roomId.trim());
       console.log("Joining room:", roomId.trim());
 
       // The socket will handle the response via gameStarted or error events

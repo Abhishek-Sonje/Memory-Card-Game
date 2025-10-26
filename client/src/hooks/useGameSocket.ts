@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useCallback } from "react";
+import { useSocket } from "./useSocket";
 import type { Player, GameCard, Scores } from "../types/games.type";
 
 interface UseGameSocketProps {
@@ -30,30 +31,20 @@ export const useGameSocket = ({
   onTurnChanged,
   onGameOver,
 }: UseGameSocketProps) => {
-  const socketRef = useRef<any>(null);
-  const SOCKET_URL =
-    process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3002";
+  // Reuse the authenticated socket connection
+  const { socket, isConnected, isAuthenticated } = useSocket();
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!socket || !isConnected || !isAuthenticated) return;
 
-    const io = require("socket.io-client");
-    socketRef.current = io(SOCKET_URL, {
-      transports: ["websocket"],
-      autoConnect: false,
-    });
-
-    const socket = socketRef.current;
-
-    // Connect and join room
-    socket.connect();
+    // Join room
     socket.emit("joinRoom", {
       roomCode,
       userId: currentUserId,
       userName: currentUserName,
     });
 
-    // Socket event listeners
+    // Set up event listeners
     socket.on("playerJoined", (data: { id: string; name: string }) => {
       onPlayerJoined(data);
     });
@@ -96,43 +87,71 @@ export const useGameSocket = ({
       }
     );
 
+    // Cleanup function
     return () => {
       socket.emit("leaveRoom", { roomCode, userId: currentUserId });
-      socket.disconnect();
+      socket.off("playerJoined");
+      socket.off("playerLeft");
+      socket.off("playerReady");
+      socket.off("gameStarted");
+      socket.off("cardFlipped");
+      socket.off("cardsMatched");
+      socket.off("cardsMismatch");
+      socket.off("turnChanged");
+      socket.off("gameOver");
     };
-  }, [roomCode, currentUserId, currentUserName]);
+  }, [
+    socket,
+    isConnected,
+    isAuthenticated,
+    roomCode,
+    currentUserId,
+    currentUserName,
+    onPlayerJoined,
+    onPlayerLeft,
+    onPlayerReady,
+    onGameStarted,
+    onCardFlipped,
+    onCardsMatched,
+    onCardsMismatch,
+    onTurnChanged,
+    onGameOver,
+  ]);
 
-  // Socket action methods
-  const emitFlipCard = (cardId: string) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("flipCard", {
-        roomCode,
-        cardId,
-        userId: currentUserId,
-      });
+  // Action methods
+  const emitFlipCard = useCallback(
+    (cardId: string) => {
+      if (socket?.connected) {
+        socket.emit("flipCard", {
+          roomCode,
+          cardId,
+          userId: currentUserId,
+        });
+      }
+    },
+    [socket, roomCode, currentUserId]
+  );
+
+  const emitPlayerReady = useCallback(
+    (ready: boolean) => {
+      if (socket?.connected) {
+        socket.emit("playerReady", {
+          roomCode,
+          userId: currentUserId,
+          ready,
+        });
+      }
+    },
+    [socket, roomCode, currentUserId]
+  );
+
+  const emitStartGame = useCallback(() => {
+    if (socket?.connected) {
+      socket.emit("startGame", { roomCode });
     }
-  };
-
-  const emitPlayerReady = (ready: boolean) => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("playerReady", {
-        roomCode,
-        userId: currentUserId,
-        ready,
-      });
-    }
-  };
-
-  const emitStartGame = () => {
-    if (socketRef.current?.connected) {
-      socketRef.current.emit("startGame", { roomCode });
-    }
-  };
-
-  const isConnected = () => socketRef.current?.connected || false;
+  }, [socket, roomCode]);
 
   return {
-    socket: socketRef.current,
     isConnected,
     emitFlipCard,
     emitPlayerReady,

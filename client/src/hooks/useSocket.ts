@@ -14,7 +14,8 @@ export function useSocket() {
       return;
     }
 
-    const socketInstance = io("http://localhost:3002", {
+    const socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3002", {
+
       auth: {
         token: authToken.token,
         userId: authToken.userId,
@@ -46,5 +47,6 @@ export function useSocket() {
     socket,
     isConnected,
     isAuthenticated,
+   
   };
 }
