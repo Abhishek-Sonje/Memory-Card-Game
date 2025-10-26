@@ -12,7 +12,9 @@ node_modules/
 client/.env
 server/.env
 packages/**/.env
-
+.env.backup
+*.env.backup
+client/.env.backup
 # Build outputs
 dist/
 build/
