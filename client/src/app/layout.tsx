@@ -49,9 +49,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html  >
+    <html lang="en" className="dark" suppressHydrationWarning>
       <body className={`${rubikIso.variable} ${zain.variable} antialiased`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <SessionProvider>{children}</SessionProvider>
         </ThemeProvider>
       </body>

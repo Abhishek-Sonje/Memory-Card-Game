@@ -4,7 +4,7 @@ export interface Player {
   ready: boolean;
 }
 
-export interface Card {
+export interface GameCard {
   id: string;
   emoji: string;
   matched: boolean;
