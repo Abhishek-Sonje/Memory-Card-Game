@@ -1,6 +1,5 @@
 import { useEffect, useCallback } from "react";
 import { useSocket } from "./useSocket";
-import type { Player, GameCard, Scores } from "../types/games.type";
 
 interface UseGameSocketProps {
   roomCode: string;
@@ -31,7 +30,6 @@ export const useGameSocket = ({
   onTurnChanged,
   onGameOver,
 }: UseGameSocketProps) => {
-  // Reuse the authenticated socket connection
   const { socket, isConnected, isAuthenticated } = useSocket();
 
   useEffect(() => {
@@ -87,6 +85,11 @@ export const useGameSocket = ({
       }
     );
 
+    // Handle errors from server
+    socket.on("error", (message: string) => {
+      console.error("Socket error:", message);
+    });
+
     // Cleanup function
     return () => {
       socket.emit("leaveRoom", { roomCode, userId: currentUserId });
@@ -99,6 +102,7 @@ export const useGameSocket = ({
       socket.off("cardsMismatch");
       socket.off("turnChanged");
       socket.off("gameOver");
+      socket.off("error");
     };
   }, [
     socket,

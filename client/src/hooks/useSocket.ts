@@ -21,6 +21,7 @@ export function useSocket() {
         userId: authToken.userId,
       },
     });
+   
 
     socketInstance.on("connect", () => {
       console.log("Connected to server");
@@ -34,6 +35,7 @@ export function useSocket() {
 
     socketInstance.on("error", (error) => {
       console.error("Socket error:", error);
+      alert("Socket error: " + error);
     });
 
     setSocket(socketInstance);
@@ -47,6 +49,7 @@ export function useSocket() {
     socket,
     isConnected,
     isAuthenticated,
+    
    
   };
 }

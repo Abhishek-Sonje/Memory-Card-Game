@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
-import { initializeDeck } from "../utils/deck";
+import { useState } from "react";
 import type { GameCard, Scores } from "../types/games.type";
 
 interface UseGameLogicProps {
   isConnected: boolean;
   emitFlipCard: (cardId: string) => void;
 }
+
+// Card emoji mapping for display (matches server's card values 0-7)
+const CARD_EMOJIS = ["🎮", "🎯", "🎲", "🎪", "🎨", "🎭", "🎸", "🎹"];
 
 export const useGameLogic = ({
   isConnected,
@@ -18,13 +20,6 @@ export const useGameLogic = ({
   const [scores, setScores] = useState<Scores>({});
   const [waitingForPlayers, setWaitingForPlayers] = useState<boolean>(false);
 
-  // Initialize deck on mount
-  useEffect(() => {
-    if (!gameStarted && cards.length === 0) {
-      setCards(initializeDeck());
-    }
-  }, [gameStarted, cards.length]);
-
   // Handle card flip
   const handleCardFlip = (cardId: string) => {
     if (flippedIds.length >= 2) return;
@@ -33,93 +28,138 @@ export const useGameLogic = ({
     const card = cards.find((c) => c.id === cardId);
     if (card?.matched) return;
 
-    // Emit to server
+    // Always emit to server (server validates turn and card state)
     emitFlipCard(cardId);
 
-    // Optimistic local update
-    setFlippedIds((prev) => [...prev, cardId]);
-
-    // Local fallback matching logic (when not connected)
-    if (flippedIds.length === 1 && !isConnected) {
-      const firstCard = cards.find((c: GameCard) => c.id === flippedIds[0]);
-      const secondCard = cards.find((c: GameCard) => c.id === cardId);
-
-      if (firstCard?.emoji === secondCard?.emoji) {
-        setTimeout(() => {
-          setCards((prev) =>
-            prev.map((c) =>
-              c.id === firstCard!.id || c.id === secondCard!.id
-                ? { ...c, matched: true }
-                : c
-            )
-          );
-          setFlippedIds([]);
-        }, 600);
-      } else {
-        setTimeout(() => {
-          setFlippedIds([]);
-        }, 1000);
-      }
-    }
+    // Don't do optimistic update - wait for server confirmation
+    // Server will send back cardFlipped event
   };
 
-  // Socket event handlers
+  // Socket event: Game started by server
   const handleGameStarted = (
     data: { deck?: string[]; currentTurn?: string },
     playersFirstId?: string
   ) => {
+    console.log("Game started:", data);
+
     setGameStarted(true);
     setWaitingForPlayers(false);
+
     if (data.deck) {
-      setCards(
-        data.deck.map(
-          (emoji, index): GameCard => ({
-            id: `card-${index}`,
-            emoji,
-            matched: false,
-          })
-        )
-      );
-    } else {
-      setCards(initializeDeck());
+      // Server sends card IDs like ["card-0", "card-1", ..., "card-15"]
+      // We don't know the values yet - they're revealed on flip
+      const initialCards: GameCard[] = data.deck.map((id) => ({
+        id,
+        emoji: "🎴", // Placeholder until revealed
+        value: null, // Unknown until server reveals
+        matched: false,
+      }));
+      setCards(initialCards);
     }
+
     setCurrentTurn(data.currentTurn || playersFirstId || null);
+    setFlippedIds([]);
   };
 
-  const handleCardFlipped = (cardId: string) => {
+  // Socket event: Card flipped by any player
+  const handleCardFlipped = (cardId: string, cardValue?: number) => {
+    console.log("Card flipped:", cardId, "Value:", cardValue);
+
+    // Update card with revealed value from server
+    setCards((prev) =>
+      prev.map((card) => {
+        if (card.id === cardId && cardValue !== undefined) {
+          return {
+            ...card,
+            emoji: CARD_EMOJIS[cardValue] || "❓",
+            value: cardValue,
+          };
+        }
+        return card;
+      })
+    );
+
+    // Track flipped cards
     setFlippedIds((prev) => {
       if (prev.includes(cardId)) return prev;
       return [...prev, cardId];
     });
   };
 
+  // Socket event: Cards matched
   const handleCardsMatched = (cardIds: string[], userId: string) => {
+    console.log("Cards matched:", cardIds, userId);
+
     setCards((prev) =>
       prev.map((card) =>
         cardIds.includes(card.id) ? { ...card, matched: true } : card
       )
     );
+
     setFlippedIds([]);
+
     setScores((prev) => ({
       ...prev,
       [userId]: (prev[userId] || 0) + 1,
     }));
   };
 
+  // Socket event: Cards don't match
   const handleCardsMismatch = () => {
+    console.log("Cards mismatch");
+
+    // Keep cards flipped for 2 seconds to show mismatch
+    // Then server will send turnChanged event
     setTimeout(() => {
+      // Reset the non-matched flipped cards
+      setCards((prev) =>
+        prev.map((card) => {
+          if (flippedIds.includes(card.id) && !card.matched) {
+            return {
+              ...card,
+              emoji: "🎴", // Hide card again
+              value: null, // Remove value
+            };
+          }
+          return card;
+        })
+      );
       setFlippedIds([]);
-    }, 1000);
+    }, 2000);
   };
 
+  // Socket event: Turn changed
   const handleTurnChanged = (userId: string) => {
+    console.log("Turn changed to:", userId);
     setCurrentTurn(userId);
   };
 
+  // Local game start (for testing without server)
   const handleLocalGameStart = () => {
+    console.log("Starting local game (no server)");
+
     setGameStarted(true);
     setWaitingForPlayers(false);
-    setCards(initializeDeck());
+
+    // Generate local deck for testing
+    const pairs = ["🎮", "🎯", "🎲", "🎪", "🎨", "🎭", "🎸", "🎹"];
+    const deck = [...pairs, ...pairs];
+
+    // Shuffle
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j]!, deck[i]!];
+    }
+
+    const localCards: GameCard[] = deck.map((emoji, index) => ({
+      id: `card-${index}`,
+      emoji,
+      value: pairs.indexOf(emoji),
+      matched: false,
+    }));
+
+    setCards(localCards);
+    setCurrentTurn("user-1"); // Set to current user for local testing
   };
 
   return {

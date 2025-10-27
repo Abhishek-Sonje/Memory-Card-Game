@@ -7,6 +7,8 @@ export interface Player {
 export interface GameCard {
   id: string;
   emoji: string;
+  value: number | null;
+ 
   matched: boolean;
 }
 
