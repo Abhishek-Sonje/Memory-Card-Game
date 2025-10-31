@@ -8,54 +8,63 @@ import {
   ModalTrigger,
 } from "./UI/animated-modal-button";
 import { motion } from "framer-motion";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function CreateRoomModal() {
-  const [roomId, setRoomId] = useState("");
   const [isCreating, setIsCreating] = useState(false);
+  const router = useRouter();
+  const { data: session, status } = useSession(); // ✅ Get status too
 
   const handleCreateRoom = async () => {
-    if (!roomId.trim()) {
-      alert("Please enter a room ID");
-      return;
-    }
-
     setIsCreating(true);
 
     try {
-      // Replace with your actual userId (from auth context/state)
-      const userId = "your-user-id";
+      // ✅ Better userId generation with fallback
+      const userId =
+        session?.user?.id || session?.user?.email || `guest-${Date.now()}`;
 
-      const response = await fetch("http://localhost:3002/api/games", {
+      console.log("Session:", session); // Debug
+      console.log("User ID being sent:", userId); // Debug
+
+      const apiUrl =
+        process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3002";
+      console.log("API URL:", `${apiUrl}/api/games`); // Debug
+
+      const response = await fetch(`${apiUrl}/api/games`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ userId, roomId: roomId.trim() }),
+        body: JSON.stringify({ userId }),
       });
 
+      const data = await response.json();
+      console.log("Response data:", data); // Debug
+
       if (!response.ok) {
-        throw new Error("Failed to create room");
+        throw new Error(data.error || data.message || "Failed to create room");
       }
 
-      const game = await response.json();
-      console.log("Game created:", game);
-
-      // TODO: Navigate to waiting room or emit hostGame socket event
-      // socket.emit("hostGame", roomId);
+      alert("Room created successfully!");
+      router.push(`/${data.roomId}/lobby`);
     } catch (error) {
       console.error("Error creating room:", error);
-      alert("Failed to create room. Please try again.");
+      alert(
+        `Failed to create room: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsCreating(false);
     }
   };
 
   return (
-    <div className=" flex items-center justify-center ">
+    <div className="flex items-center justify-center">
       <Modal>
-      <ModalTrigger className="bg-black dark:bg-white dark:text-black text-white flex justify-center group/modal-btn px-7 py-4 text-lg">
-
-          <span className="group-hover/modal-btn:translate-x-40 text-center transition duration-500  text-xl">
+        <ModalTrigger className="bg-black dark:bg-white dark:text-black text-white flex justify-center group/modal-btn px-7 py-4 text-lg">
+          <span className="group-hover/modal-btn:translate-x-40 text-center transition duration-500 text-xl">
             Create Room
           </span>
           <div className="-translate-x-40 group-hover/modal-btn:translate-x-0 flex items-center justify-center absolute inset-0 transition duration-500 text-white z-20">
@@ -83,10 +92,26 @@ export default function CreateRoomModal() {
             <div className="text-center mb-10">
               <h4 className="text-2xl md:text-3xl text-neutral-800 dark:text-neutral-100 font-bold mb-2">
                 Create Game Room
-              </h4>   
+              </h4>
               <p className="text-sm text-neutral-500 dark:text-neutral-400">
                 Set up a room and invite your friend to play
               </p>
+              {/* ✅ Show session status for debugging */}
+              {status === "loading" && (
+                <p className="text-xs text-neutral-400 mt-2">
+                  Loading session...
+                </p>
+              )}
+              {status === "unauthenticated" && (
+                <p className="text-xs text-yellow-600 mt-2">
+                  ⚠️ Not authenticated - will use guest ID
+                </p>
+              )}
+              {status === "authenticated" && session?.user && (
+                <p className="text-xs text-green-600 mt-2">
+                  ✓ Logged in as {session.user.email || session.user.name}
+                </p>
+              )}
             </div>
 
             <div className="flex justify-center items-center mb-8">
@@ -97,39 +122,9 @@ export default function CreateRoomModal() {
                 className="w-full max-w-md"
               >
                 <div className="relative">
-                  <label
-                    htmlFor="roomId"
-                    className="block text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-3 uppercase tracking-wide"
-                  >
-                    Room ID
-                  </label>
                   <div className="relative group">
-                    <input
-                      id="roomId"
-                      type="text"
-                      value={roomId}
-                      onChange={(e) => setRoomId(e.target.value)}
-                      placeholder="e.g., game-123"
-                      className="w-full px-5 py-4 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:outline-none focus:border-black dark:focus:border-white transition-all duration-200 text-base font-medium"
-                    />
                     <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-black to-neutral-800 dark:from-white dark:to-neutral-200 opacity-0 group-focus-within:opacity-5 transition-opacity pointer-events-none" />
                   </div>
-                  <p className="mt-3 text-xs text-neutral-500 dark:text-neutral-500 flex items-center gap-1.5">
-                    <svg
-                      className="w-3.5 h-3.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
-                    </svg>
-                    Share this ID with your friend to start playing
-                  </p>
                 </div>
               </motion.div>
             </div>
@@ -202,7 +197,7 @@ export default function CreateRoomModal() {
             </button>
             <button
               onClick={handleCreateRoom}
-              disabled={isCreating || !roomId.trim()}
+              disabled={isCreating || status === "loading"} // ✅ Disable while loading
               className="px-6 py-2.5 bg-black text-white dark:bg-white dark:text-black text-sm font-medium rounded-lg border border-black dark:border-white hover:bg-neutral-800 dark:hover:bg-neutral-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200 min-w-[120px]"
             >
               {isCreating ? (
@@ -239,6 +234,7 @@ export default function CreateRoomModal() {
   );
 }
 
+// Icon components remain the same...
 const GameIcon = ({ className }: { className?: string }) => {
   return (
     <svg

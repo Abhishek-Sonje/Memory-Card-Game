@@ -123,6 +123,18 @@ export const useGameSocket = ({
   ]);
 
   // Action methods
+    const emitJoinGame = () => {
+      if (socket && isConnected) {
+        console.log("Emitting joinGame for room:", roomCode);
+        socket.emit("joinGame", {
+          roomCode,
+          userId: currentUserId,
+          userName: currentUserName,
+        });
+      } else {
+        console.warn("Cannot join game - socket not connected");
+      }
+    };
   const emitFlipCard = useCallback(
     (cardId: string) => {
       if (socket?.connected) {
@@ -155,10 +167,13 @@ export const useGameSocket = ({
     }
   }, [socket, roomCode]);
 
+
+
   return {
     isConnected,
     emitFlipCard,
     emitPlayerReady,
     emitStartGame,
+    emitJoinGame,
   };
 };
