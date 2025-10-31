@@ -6,7 +6,7 @@ import jwt from "jsonwebtoken";
 
 import { db } from "./lib/db.ts";
 import { games, leaderboard, moves, players } from "@memory-game/shared";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, or, sql } from "drizzle-orm";
 
 const app = express();
 
@@ -110,20 +110,22 @@ const gameStates = new Map<string, GameState>();
 app.post("/api/games", async (req, res) => {
   try {
     console.log("Creating game with body:", req.body);
-    const { userId, roomId } = req.body;
-    if (!userId || !roomId) {
-      return res.status(400).json({ error: "Missing roomId or userId" });
+    const { userId } = req.body;
+    if (!userId ) {
+      return res.status(400).json({ error: "Missing userId" });
     }
 
     // Check if game already exists
+    const roomId = `ROOM-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    console.log("Generated roomId:", roomId);
+
     const existingGame = await db.query.games.findFirst({
-      where: eq(games.roomId, roomId),
+      where: or(eq(games.hostId, userId),eq(games.opponentId, userId)),
     });
 
-    if (existingGame) {
-      console.log("Game already exists:", existingGame);
-      return res.json(existingGame);
-    }
+   if(existingGame){
+     return res.status(400).json({ error: "User is already in a game" });
+   }
 
     const newGame = {
       hostId: userId,
