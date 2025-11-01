@@ -1,6 +1,5 @@
 "use client";
-
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useSocket } from "../hooks/useSocket";
 import {
   Modal,
@@ -10,37 +9,95 @@ import {
   ModalTrigger,
 } from "./UI/animated-modal-button";
 import { motion } from "framer-motion";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function JoinRoomModal() {
-  const { socket, isConnected, isAuthenticated } = useSocket();
+  const { socket, isConnected } = useSocket();
   const [roomId, setRoomId] = useState("");
   const [isJoining, setIsJoining] = useState(false);
+  const [error, setError] = useState("");
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  const userId =
+    session?.user?.id || session?.user?.email || `guest-${Date.now()}`;
+  const userName = session?.user?.name || "Guest";
+
+  // Listen for socket events
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleLobbyUpdate = (data: { players: any[] }) => {
+      console.log("✅ Joined lobby successfully, players:", data.players);
+      setIsJoining(false);
+      // Navigate to lobby page
+      router.push(`/${roomId}/lobby`);
+    };
+
+    const handleError = (errorMsg: string) => {
+      console.error("❌ Socket error:", errorMsg);
+      setError(errorMsg);
+      setIsJoining(false);
+    };
+
+    socket.on("lobbyUpdate", handleLobbyUpdate);
+    socket.on("error", handleError);
+
+    return () => {
+      socket.off("lobbyUpdate", handleLobbyUpdate);
+      socket.off("error", handleError);
+    };
+  }, [socket, roomId, router]);
 
   const handleJoinRoom = async () => {
     if (!roomId.trim()) {
-      alert("Please enter a room ID");
+      setError("Please enter a room ID");
       return;
     }
 
-      if (!socket || !isConnected) {
-        alert("Not connected to the server yet!");
-        return;
-      }
+    if (!socket || !isConnected) {
+      setError("Not connected to the server yet!");
+      return;
+    }
 
     setIsJoining(true);
+    setError("");
 
     try {
-      // Replace with your actual userId and socket instance
-      
+      const apiUrl =
+        process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3002";
+      const trimmedRoomId = roomId.trim();
 
-      // TODO: Emit joinGame socket event
-      socket.emit("joinGame", roomId.trim());
-      console.log("Joining room:", roomId.trim());
+      console.log("🔍 Checking if game exists:", trimmedRoomId);
 
-      // The socket will handle the response via gameStarted or error events
+      // Step 1: Verify game exists via API
+      const response = await fetch(`${apiUrl}/api/${trimmedRoomId}/game`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || "Game not found");
+      }
+
+      const data = await response.json();
+      console.log("✅ Game found:", data.game);
+
+      if (data.game.status !== "waiting") {
+        throw new Error("Game has already started or ended");
+      }
+
+      // Step 2: Join lobby via Socket.IO
+      console.log("🔌 Emitting joinLobby:", {
+        roomId: trimmedRoomId,
+        userId,
+        userName,
+      });
+      socket.emit("joinLobby", trimmedRoomId, userId, userName);
+
+      // Navigation will happen in the lobbyUpdate listener
     } catch (error) {
-      console.error("Error joining room:", error);
-      alert("Failed to join room. Please try again.");
+      console.error("❌ Error joining room:", error);
+      setError(error instanceof Error ? error.message : "Failed to join room");
       setIsJoining(false);
     }
   };
@@ -49,7 +106,6 @@ export default function JoinRoomModal() {
     <div className="flex items-center justify-center">
       <Modal>
         <ModalTrigger className="bg-black dark:bg-white dark:text-black text-white flex justify-center group/modal-btn px-8 py-4 text-lg">
-          {" "}
           <span className="group-hover/modal-btn:translate-x-40 text-center transition duration-500 text-xl">
             Join Room
           </span>
@@ -64,7 +120,6 @@ export default function JoinRoomModal() {
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
-              className="icon icon-tabler icons-tabler-outline icon-tabler-search"
             >
               <path stroke="none" d="M0 0h24v24H0z" fill="none" />
               <path d="M10 10m-7 0a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
@@ -102,12 +157,42 @@ export default function JoinRoomModal() {
                       id="roomId"
                       type="text"
                       value={roomId}
-                      onChange={(e) => setRoomId(e.target.value)}
-                      placeholder="e.g., game-123"
-                      className="w-full px-5 py-4 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:outline-none focus:border-black dark:focus:border-white transition-all duration-200 text-base font-medium"
+                      onChange={(e) => {
+                        setRoomId(e.target.value);
+                        setError(""); // Clear error when typing
+                      }}
+                      placeholder="e.g., ROOM-ABC123"
+                      className="w-full px-5 py-4 rounded-xl border-2 border-neutral-200 dark:border-neutral-700 bg-neutral-50 dark:bg-neutral-900 text-neutral-900 dark:text-neutral-100 placeholder:text-neutral-400 dark:placeholder:text-neutral-600 focus:outline-none focus:border-black dark:focus:border-white transition-all duration-200 text-base font-medium uppercase"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          handleJoinRoom();
+                        }
+                      }}
                     />
                     <div className="absolute inset-0 rounded-xl bg-gradient-to-r from-black to-neutral-800 dark:from-white dark:to-neutral-200 opacity-0 group-focus-within:opacity-5 transition-opacity pointer-events-none" />
                   </div>
+
+                  {error && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mt-3 text-sm text-red-500 flex items-center gap-1.5"
+                    >
+                      <svg
+                        className="w-4 h-4"
+                        fill="currentColor"
+                        viewBox="0 0 20 20"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      {error}
+                    </motion.p>
+                  )}
+
                   <p className="mt-3 text-xs text-neutral-500 dark:text-neutral-500 flex items-center gap-1.5">
                     <svg
                       className="w-3.5 h-3.5"
@@ -118,7 +203,7 @@ export default function JoinRoomModal() {
                       <path
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        strokeWidth={2}
+                        strokeWidth="2"
                         d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
                       />
                     </svg>
@@ -128,6 +213,7 @@ export default function JoinRoomModal() {
               </motion.div>
             </div>
 
+            {/* Game info cards */}
             <div className="grid grid-cols-2 gap-3 max-w-md mx-auto">
               <motion.div
                 initial={{ y: 10, opacity: 0 }}
@@ -213,12 +299,12 @@ export default function JoinRoomModal() {
                       r="10"
                       stroke="currentColor"
                       strokeWidth="4"
-                    ></circle>
+                    />
                     <path
                       className="opacity-75"
                       fill="currentColor"
                       d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    ></path>
+                    />
                   </svg>
                   Joining...
                 </span>
@@ -233,94 +319,87 @@ export default function JoinRoomModal() {
   );
 }
 
-const GameIcon = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2z" />
-      <path d="M9 12h6" />
-      <path d="M12 9v6" />
-    </svg>
-  );
-};
+// Icon components (keep your existing ones)
+const GameIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <path d="M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2v-10a2 2 0 0 1 2 -2z" />
+    <path d="M9 12h6" />
+    <path d="M12 9v6" />
+  </svg>
+);
 
-const UsersIcon = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
-      <path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      <path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
-    </svg>
-  );
-};
+const UsersIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <path d="M9 7m-4 0a4 4 0 1 0 8 0a4 4 0 1 0 -8 0" />
+    <path d="M3 21v-2a4 4 0 0 1 4 -4h4a4 4 0 0 1 4 4v2" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    <path d="M21 21v-2a4 4 0 0 0 -3 -3.85" />
+  </svg>
+);
 
-const TrophyIcon = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M8 21l8 0" />
-      <path d="M12 17l0 4" />
-      <path d="M7 4l10 0" />
-      <path d="M17 4v8a5 5 0 0 1 -10 0v-8" />
-      <path d="M5 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-      <path d="M19 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
-    </svg>
-  );
-};
+const TrophyIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <path d="M8 21l8 0" />
+    <path d="M12 17l0 4" />
+    <path d="M7 4l10 0" />
+    <path d="M17 4v8a5 5 0 0 1 -10 0v-8" />
+    <path d="M5 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+    <path d="M19 9m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+  </svg>
+);
 
-const ClockIcon = ({ className }: { className?: string }) => {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
-      <path d="M12 12l3 2" />
-      <path d="M12 7v5" />
-    </svg>
-  );
-};
+const ClockIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="24"
+    height="24"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+    <path d="M12 12m-9 0a9 9 0 1 0 18 0a9 9 0 1 0 -18 0" />
+    <path d="M12 12l3 2" />
+    <path d="M12 7v5" />
+  </svg>
+);

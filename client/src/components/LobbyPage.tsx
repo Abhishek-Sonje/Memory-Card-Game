@@ -44,8 +44,9 @@ export default function LobbyPage({
   useEffect(() => {
     const fetchGameData = async () => {
       try {
-        const response = await fetch(`/api/games/${roomId}`);
+        const response = await fetch(process.env.NEXT_PUBLIC_SOCKET_URL + `/api/${roomId}/game`);
         if (!response.ok) {
+          console.error("Game not foundddd");
           router.push("/"); // Game not found, redirect home
           return;
         }
