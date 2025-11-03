@@ -36,8 +36,11 @@ const server = createServer(app);
 const io = new Server(server, {
   cors: {
     origin: ["http://localhost:3000", "http://localhost:3001"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   },
+  pingTimeout: 6000,
+  pingInterval:25000,
 });
 
 // Constants
@@ -184,10 +187,10 @@ app.get("/api/:roomId/game", async (req, res) => {
     const game = await db.query.games.findFirst({
       where: eq(games.roomId, roomId),
     });
-    console.log("game founded",game);
+    console.log("game founded", game);
 
     if (!game) {
-      console.log("game not foundddddddd")
+      console.log("game not foundddddddd");
       return res.status(404).json({ error: "Game not founddddddddddddd" });
     }
 
@@ -280,21 +283,55 @@ io.on("connection", (socket) => {
       userName: string;
     }) => {
       try {
-        console.log(`User ${userName} joining lobby ${roomId}`);
+        console.log(`JOIN LOBBY:`, { roomId, userId, userName });
+         console.log("📥 RAW JOIN LOBBY DATA:", {
+           received: { roomId, userId, userName },
+           types: {
+             roomId: typeof roomId,
+             userId: typeof userId,
+             userName: typeof userName,
+           },
+           socketId: socket.id,
+         });
 
-        const game = await db.query.games.findFirst({
+          if (!roomId || !userId || !userName) {
+            console.error("❌ Invalid join lobby data:", { roomId, userId, userName });
+            socket.emit(
+              "error",
+              "Missing required fields: roomId, userId, or userName"
+            );
+            return;
+          }
+
+        let game = await db.query.games.findFirst({
           where: eq(games.roomId, roomId),
         });
 
         if (!game) {
+          console.log("findFirst failed, trying select()");
+          const result = await db
+            .select()
+            .from(games)
+            .where(eq(games.roomId, roomId))
+            .limit(1);
+          game = result[0];
+        }
+
+        // Log result for debugging
+        console.log("Game found?", !!game, game);
+
+        if (!game) {
+          console.error("Game not found for roomId:", roomId);
           return socket.emit("error", "Game not found");
         }
 
         if (game.status !== "waiting") {
+          console.error("Game already started. Status:", game.status);
           return socket.emit("error", "Game already started");
         }
 
         socket.join(`lobby-${roomId}`);
+        console.log(`Socket joined room lobby-${roomId}`);
 
         // Initialize or get lobby state
         let lobby = lobbyStates.get(roomId);
@@ -305,6 +342,7 @@ io.on("connection", (socket) => {
             players: new Map(),
           };
           lobbyStates.set(roomId, lobby);
+          console.log("Created new lobby state");
         }
 
         // Add player to lobby
@@ -320,6 +358,7 @@ io.on("connection", (socket) => {
             .update(games)
             .set({ opponentId: userId })
             .where(eq(games.id, game.id));
+          console.log("Updated database with opponentId");
         }
 
         // Broadcast updated player list to lobby
@@ -328,7 +367,7 @@ io.on("connection", (socket) => {
           players: playersList,
         });
 
-        console.log(`Lobby ${roomId} now has ${playersList.length} players`);
+        console.log("Emitted lobbyUpdate with players:", playersList);
       } catch (error) {
         console.error("Error joining lobby:", error);
         socket.emit("error", "Failed to join lobby");

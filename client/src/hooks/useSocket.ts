@@ -14,14 +14,20 @@ export function useSocket() {
       return;
     }
 
-    const socketInstance = io(process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3002", {
-
-      auth: {
-        token: authToken.token,
-        userId: authToken.userId,
-      },
-    });
-   
+    const socketInstance = io(
+      process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3002",
+      {
+        autoConnect: true,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+        transports: ["websocket", "polling"],
+        auth: {
+          token: authToken.token,
+          userId: authToken.userId,
+        },
+      }
+    );
 
     socketInstance.on("connect", () => {
       console.log("Connected to server");
@@ -34,7 +40,7 @@ export function useSocket() {
     });
 
     socketInstance.on("error", (error) => {
-      console.error("Socket error:", error);
+      // console.error("Socket error:", error);
       alert("Socket error: " + error);
     });
 
@@ -49,7 +55,5 @@ export function useSocket() {
     socket,
     isConnected,
     isAuthenticated,
-    
-   
   };
 }

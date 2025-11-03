@@ -35,8 +35,9 @@ export default function JoinRoomModal() {
       router.push(`/${roomId}/lobby`);
     };
 
+
     const handleError = (errorMsg: string) => {
-      console.error("❌ Socket error:", errorMsg);
+      // console.error("❌ Socket error:", errorMsg);
       setError(errorMsg);
       setIsJoining(false);
     };
@@ -49,6 +50,17 @@ export default function JoinRoomModal() {
       socket.off("error", handleError);
     };
   }, [socket, roomId, router]);
+
+
+  
+    useEffect(() => {
+      console.log("🔍 Component state:", {
+        roomId,
+        userId,
+        userName,
+        socketConnected: socket?.connected,
+      });
+    }, [roomId, userId, userName, socket]);
 
   const handleJoinRoom = async () => {
     if (!roomId.trim()) {
@@ -92,7 +104,12 @@ export default function JoinRoomModal() {
         userId,
         userName,
       });
-      socket.emit("joinLobby", trimmedRoomId, userId, userName);
+      if (!roomId || !userId || !userName) {
+        console.error("Missing required data:", { roomId, userId, userName });
+        setError("Missing required information");
+        return;
+      }
+      socket.emit("joinLobby", { roomId: trimmedRoomId, userId, userName });
 
       // Navigation will happen in the lobbyUpdate listener
     } catch (error) {
