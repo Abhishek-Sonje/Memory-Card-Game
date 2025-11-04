@@ -30,16 +30,15 @@ export default function GamePage({
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // Refs for socket actions to avoid circular dependencies
+  // Refs for socket actions
   const emitFlipCardRef = useRef<(cardId: string) => void>(() => {});
-  const emitPlayerReadyRef = useRef<(ready: boolean) => void>(() => {});
-  const hasJoinedGameRef = useRef(false); // ✅ Track if already joined
-
+  const hasJoinedGameRef = useRef(false);
+  const apiUrl = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:3002";
   // Verify game exists and is in progress
   useEffect(() => {
     const fetchGame = async () => {
       try {
-        const response = await fetch(`/api/games/${roomId}`);
+        const response = await fetch(`${apiUrl}/api/${roomId}/game`);
         if (!response.ok) {
           console.error("Game not found");
           router.push("/");
@@ -64,28 +63,27 @@ export default function GamePage({
     fetchGame();
   }, [roomId, router]);
 
-  // Game Logic
+  // Game Logic - simplified without player ready emissions
   const gameLogic = useGameLogic({
     isConnected,
     emitFlipCard: (cardId: string) => emitFlipCardRef.current(cardId),
   });
 
-  // Player Management
+  // Player Management - simplified for in-game state
   const playerManager = usePlayerManagement({
     currentUserId: userId,
     currentUserName: userName,
-    emitPlayerReady: (ready: boolean) => emitPlayerReadyRef.current(ready),
+    emitPlayerReady: () => {}, // No ready state in active game
   });
 
-  // Initialize Socket for GAME room (not lobby)
+  // Initialize Socket for GAME room
   const socketActions = useGameSocket({
     roomCode: roomId,
     currentUserId: userId,
     currentUserName: userName,
     onPlayerJoined: (player) => playerManager.handlePlayerJoined(player),
     onPlayerLeft: (userId) => playerManager.handlePlayerLeft(userId),
-    onPlayerReady: (userId, ready) =>
-      playerManager.handlePlayerReady(userId, ready),
+    onPlayerReady: () => {}, // Not used in active game
     onGameStarted: (data) =>
       gameLogic.handleGameStarted(data, gameData?.hostId),
     onCardFlipped: (cardId) => gameLogic.handleCardFlipped(cardId),
@@ -99,28 +97,21 @@ export default function GamePage({
         router.push("/");
       }, 3000);
     },
-    // onOpponentDisconnected: (data) => {
-    //   alert("Your opponent disconnected. Waiting for reconnection...");
-    // },
-    // onOpponentReconnected: (data) => {
-    //   alert("Your opponent reconnected!");
-    // },
   });
 
   // Update refs when socket actions are ready
   useEffect(() => {
     emitFlipCardRef.current = socketActions.emitFlipCard;
-    emitPlayerReadyRef.current = socketActions.emitPlayerReady;
   }, [socketActions]);
 
-  // ✅ Join game room when component mounts and game data is loaded
+  // Join game room when ready
   useEffect(() => {
     if (gameData && isConnected && !hasJoinedGameRef.current) {
       console.log("Joining game room:", roomId);
-      socketActions.emitJoinGame(); // ✅ FIXED: Use emitJoinGame, not emitStartGame
+      socketActions.emitJoinGame();
       hasJoinedGameRef.current = true;
     }
-  }, [gameData, isConnected, roomId]);
+  }, [gameData, isConnected, roomId, socketActions]);
 
   // Initialize players from game data
   useEffect(() => {
@@ -129,7 +120,7 @@ export default function GamePage({
         {
           id: gameData.hostId,
           name: gameData.hostId === userId ? userName : "Host",
-          ready: true,
+          ready: true, // Always ready in active game
         },
       ];
 
@@ -137,11 +128,10 @@ export default function GamePage({
         initialPlayers.push({
           id: gameData.opponentId,
           name: gameData.opponentId === userId ? userName : "Opponent",
-          ready: true,
+          ready: true, // Always ready in active game
         });
       }
 
-      // You might need to add these players to playerManager
       console.log("Game players:", initialPlayers);
     }
   }, [gameData, userId, userName]);
@@ -192,7 +182,7 @@ export default function GamePage({
           roomCode={roomId}
           copied={copied}
           onCopy={handleCopyRoomCode}
-          playersCount={2} // Always 2 in active game
+          playersCount={2}
           onToggleDrawer={() => setIsDrawerOpen(!isDrawerOpen)}
           isDrawerOpen={isDrawerOpen}
         />
@@ -215,13 +205,13 @@ export default function GamePage({
             }
           />
 
-          {/* Side Panel (Desktop) */}
+          {/* Side Panel (Desktop) - No ready/start game controls */}
           <SidePanel
             players={playerManager.players}
             currentUserId={userId}
             scores={gameLogic.scores}
-            OnReadyToggle={playerManager.handleReadyToggle}
-            onStartGame={() => {}} // No start game in active game
+            OnReadyToggle={() => {}} // Disabled in active game
+            onStartGame={() => {}} // Disabled in active game
             isHost={isHost}
             allReady={true}
             gameStarted={true}
@@ -253,7 +243,7 @@ export default function GamePage({
         )}
       </div>
 
-      {/* Mobile Drawer */}
+      {/* Mobile Drawer - No ready/start game controls */}
       <MobileDrawer
         isOpen={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
@@ -261,8 +251,8 @@ export default function GamePage({
         copied={copied}
         onCopy={handleCopyRoomCode}
         players={playerManager.players}
-        onReadyToggle={playerManager.handleReadyToggle}
-        onStartGame={() => {}} // No start game in active game
+        onReadyToggle={() => {}} // Disabled in active game
+        onStartGame={() => {}} // Disabled in active game
         isHost={isHost}
         allReady={true}
         gameStarted={true}

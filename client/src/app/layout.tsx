@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
-import { ThemeProvider } from "next-themes"
-import { Rubik_Iso,Zain ,Poppins} from "next/font/google";
+import { ThemeProvider } from "next-themes";
+import { Rubik_Iso, Zain, Poppins } from "next/font/google";
 import "./globals.css";
+import { SocketProvider } from "../context/SocketProvider"
 
 const rubikIso = Rubik_Iso({
   subsets: ["latin"],
@@ -51,8 +52,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${rubikIso.variable} ${zain.variable} antialiased`}>
-        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
-          <SessionProvider>{children}</SessionProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <SessionProvider>
+            <SocketProvider>{children}</SocketProvider>
+          </SessionProvider>
         </ThemeProvider>
       </body>
     </html>
