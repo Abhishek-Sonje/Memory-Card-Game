@@ -39,14 +39,15 @@ const io = new Server(server, {
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
   },
-  pingTimeout: 6000,
-  pingInterval:25000,
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
 // Constants
 const CARD_PAIRS = 8;
 const TOTAL_CARDS = CARD_PAIRS * 2;
 const NO_MATCH_DELAY = 2000;
+const RECONNECTION_GRACE_PERIOD = 30000; // 30 seconds
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key";
 
 // Middleware for Socket.IO authentication
@@ -104,6 +105,7 @@ interface Player {
   id: string;
   name: string;
   ready: boolean;
+  socketId?: string;
 }
 
 interface LobbyState {
@@ -123,10 +125,15 @@ interface GameState {
   hostPlayerId: string;
   opponentPlayerId: string;
   isProcessing: boolean;
+  disconnectionTimers: Map<string, NodeJS.Timeout>;
 }
 
 const lobbyStates = new Map<string, LobbyState>();
 const gameStates = new Map<string, GameState>();
+// Track user -> socketId mapping to prevent duplicate connections
+const userSocketMap = new Map<string, string>();
+// Track socketId -> userId for cleanup
+const socketUserMap = new Map<string, string>();
 
 // ============================================
 // REST API ENDPOINTS
@@ -190,8 +197,8 @@ app.get("/api/:roomId/game", async (req, res) => {
     console.log("game founded", game);
 
     if (!game) {
-      console.log("game not foundddddddd");
-      return res.status(404).json({ error: "Game not founddddddddddddd" });
+      console.log("game not found");
+      return res.status(404).json({ error: "Game not found" });
     }
 
     res.json({ game });
@@ -255,6 +262,15 @@ function cleanupLobbyState(roomId: string) {
 }
 
 function cleanupGameState(roomId: string) {
+  const gameState = gameStates.get(roomId);
+
+  // Clear any pending disconnection timers
+  if (gameState) {
+    for (const timer of gameState.disconnectionTimers.values()) {
+      clearTimeout(timer);
+    }
+  }
+
   gameStates.delete(roomId);
   console.log(`Cleaned up game state for room: ${roomId}`);
 }
@@ -264,7 +280,25 @@ function cleanupGameState(roomId: string) {
 // ============================================
 
 io.on("connection", (socket) => {
-  console.log("User connected:", socket.data.userId);
+  const userId = socket.data.userId;
+  console.log("User connected:", userId, "Socket:", socket.id);
+
+  // Handle duplicate connections - disconnect old socket
+  const existingSocketId = userSocketMap.get(userId);
+  if (existingSocketId && existingSocketId !== socket.id) {
+    console.log(`Disconnecting duplicate connection for user ${userId}`);
+    const existingSocket = io.sockets.sockets.get(existingSocketId);
+    if (existingSocket) {
+      existingSocket.emit("duplicateConnection", {
+        message: "You connected from another device/tab",
+      });
+      existingSocket.disconnect(true);
+    }
+  }
+
+  // Track this connection
+  userSocketMap.set(userId, socket.id);
+  socketUserMap.set(socket.id, userId);
 
   // ==========================================
   // LOBBY EVENTS
@@ -284,24 +318,28 @@ io.on("connection", (socket) => {
     }) => {
       try {
         console.log(`JOIN LOBBY:`, { roomId, userId, userName });
-         console.log("📥 RAW JOIN LOBBY DATA:", {
-           received: { roomId, userId, userName },
-           types: {
-             roomId: typeof roomId,
-             userId: typeof userId,
-             userName: typeof userName,
-           },
-           socketId: socket.id,
-         });
+        console.log("📥 RAW JOIN LOBBY DATA:", {
+          received: { roomId, userId, userName },
+          types: {
+            roomId: typeof roomId,
+            userId: typeof userId,
+            userName: typeof userName,
+          },
+          socketId: socket.id,
+        });
 
-          if (!roomId || !userId || !userName) {
-            console.error("❌ Invalid join lobby data:", { roomId, userId, userName });
-            socket.emit(
-              "error",
-              "Missing required fields: roomId, userId, or userName"
-            );
-            return;
-          }
+        if (!roomId || !userId || !userName) {
+          console.error("❌ Invalid join lobby data:", {
+            roomId,
+            userId,
+            userName,
+          });
+          socket.emit(
+            "error",
+            "Missing required fields: roomId, userId, or userName"
+          );
+          return;
+        }
 
         let game = await db.query.games.findFirst({
           where: eq(games.roomId, roomId),
@@ -317,7 +355,6 @@ io.on("connection", (socket) => {
           game = result[0];
         }
 
-        // Log result for debugging
         console.log("Game found?", !!game, game);
 
         if (!game) {
@@ -325,9 +362,20 @@ io.on("connection", (socket) => {
           return socket.emit("error", "Game not found");
         }
 
-        if (game.status !== "waiting") {
-          console.error("Game already started. Status:", game.status);
-          return socket.emit("error", "Game already started");
+        // ✅ PREVENT JOINING LOBBY IF GAME IS ACTIVE
+        if (game.status === "in_progress") {
+          console.error("Game already in progress. Status:", game.status);
+          socket.emit("gameInProgress", {
+            message: "This game is already in progress",
+            roomId,
+            gameId: game.id,
+          });
+          return;
+        }
+
+        if (game.status === "completed") {
+          console.error("Game already completed");
+          return socket.emit("error", "This game has already ended");
         }
 
         socket.join(`lobby-${roomId}`);
@@ -350,6 +398,7 @@ io.on("connection", (socket) => {
           id: userId,
           name: userName,
           ready: false,
+          socketId: socket.id,
         });
 
         // If this is opponent joining, update database
@@ -469,8 +518,22 @@ io.on("connection", (socket) => {
         return socket.emit("error", "All players must be ready");
       }
 
+      // ✅ UPDATE GAME STATUS TO 'in_progress' IN DATABASE
+      await db
+        .update(games)
+        .set({
+          status: "in_progress",
+          startedAt: new Date(),
+        })
+        .where(eq(games.id, game.id));
+
+      console.log(`✅ Game ${roomId} status updated to 'in_progress'`);
+
       // Notify lobby that game is starting
-      io.to(`lobby-${roomId}`).emit("gameStarting", { status: "starting" });
+      io.to(`lobby-${roomId}`).emit("gameStarting", {
+        status: "starting",
+        roomId,
+      });
 
       // Clean up lobby state
       cleanupLobbyState(roomId);
@@ -513,7 +576,13 @@ io.on("connection", (socket) => {
           return socket.emit("error", "Game not in progress");
         }
 
+        // Verify user is part of this game
+        if (userId !== game.hostId && userId !== game.opponentId) {
+          return socket.emit("error", "You are not part of this game");
+        }
+
         socket.join(`game-${roomCode}`);
+        console.log(`✅ User ${userId} joined game room: game-${roomCode}`);
 
         // Initialize game state if not exists
         let gameState = gameStates.get(roomCode);
@@ -555,9 +624,12 @@ io.on("connection", (socket) => {
             hostPlayerId: hostPlayer.id,
             opponentPlayerId: opponentPlayer.id,
             isProcessing: false,
+            disconnectionTimers: new Map(),
           };
 
           gameStates.set(roomCode, gameState);
+
+          console.log(`✅ Initialized game state for room ${roomCode}`);
 
           // Broadcast game started to all players in game room
           io.to(`game-${roomCode}`).emit("gameStarted", {
@@ -565,9 +637,28 @@ io.on("connection", (socket) => {
             currentTurn: game.hostId,
           });
         } else {
-          // Send current game state to joining player
+          // ✅ HANDLE RECONNECTION - Clear disconnection timer
+          const timer = gameState.disconnectionTimers.get(userId);
+          if (timer) {
+            clearTimeout(timer);
+            gameState.disconnectionTimers.delete(userId);
+            console.log(
+              `✅ User ${userId} reconnected, cleared disconnect timer`
+            );
+
+            // Notify other player
+            io.to(`game-${roomCode}`).emit("opponentReconnected", { userId });
+          }
+
+          // Send current game state to joining/reconnecting player
           socket.emit("gameStarted", {
             deck: gameState.cards.map((_, index) => `card-${index}`),
+            currentTurn: gameState.currentTurn,
+          });
+
+          // Send matched cards
+          socket.emit("syncGameState", {
+            matchedCards: Array.from(gameState.matchedCards),
             currentTurn: gameState.currentTurn,
           });
         }
@@ -801,13 +892,18 @@ io.on("connection", (socket) => {
     }
   );
 
-  // Handle disconnect
-  // Handle disconnect
+  // ==========================================
+  // DISCONNECT HANDLER WITH RECONNECTION GRACE PERIOD
+  // ==========================================
   socket.on("disconnect", () => {
-    const userId = socket.data.userId;
-    console.log("User disconnected:", userId);
+    const userId = socketUserMap.get(socket.id);
+    if (!userId) return;
 
-    // Find which rooms the user was in and clean up
+    console.log("User disconnected:", userId, "Socket:", socket.id);
+
+    // Clean up tracking maps
+    userSocketMap.delete(userId);
+    socketUserMap.delete(socket.id);
 
     // 1. Clean up lobby states
     for (const [roomId, lobby] of lobbyStates.entries()) {
@@ -826,41 +922,63 @@ io.on("connection", (socket) => {
           cleanupLobbyState(roomId);
         }
 
-        // If the host disconnected, you might want to end the game
+        // If the host disconnected, notify players
         if (lobby.hostId === userId && lobby.players.size > 0) {
           io.to(`lobby-${roomId}`).emit("hostDisconnected", {
             message: "Host has left the lobby",
           });
-          // Optionally: delete the game from database
         }
       }
     }
 
-    // 2. Clean up active game states
+    // 2. Handle active game disconnections with grace period
     for (const [roomId, gameState] of gameStates.entries()) {
       if (gameState.hostId === userId || gameState.opponentId === userId) {
-        console.log(`Player ${userId} disconnected from active game ${roomId}`);
+        console.log(
+          `⏳ Player ${userId} disconnected from active game ${roomId} - starting grace period`
+        );
 
         // Notify other player
         io.to(`game-${roomId}`).emit("opponentDisconnected", {
           userId,
-          message: "Your opponent has disconnected",
+          message: "Your opponent disconnected. Waiting for reconnection...",
         });
 
-        // Update game status in database (optional - mark as abandoned)
-        db.update(games)
-          .set({
-            status: "completed",
-            endedAt: new Date(),
-            // You could add a "disconnected" field or handle winner logic
-          })
-          .where(eq(games.roomId, roomId))
-          .catch((err) =>
-            console.error("Error updating game on disconnect:", err)
+        // Set disconnection timer
+        const disconnectionTimer = setTimeout(async () => {
+          console.log(
+            `❌ Player ${userId} did not reconnect within grace period. Ending game ${roomId}`
           );
 
-        // Clean up game state
-        cleanupGameState(roomId);
+          // Determine winner (the player who didn't disconnect)
+          const winnerId =
+            gameState.hostId === userId
+              ? gameState.opponentId
+              : gameState.hostId;
+
+          // Update game status in database
+          await db
+            .update(games)
+            .set({
+              status: "completed",
+              winnerId: winnerId,
+              endedAt: new Date(),
+            })
+            .where(eq(games.roomId, roomId));
+
+          // Notify remaining player
+          io.to(`game-${roomId}`).emit("gameOver", {
+            reason: "opponent_disconnect",
+            winner: { userId: winnerId },
+            message: "You win! Your opponent disconnected.",
+          });
+
+          // Clean up game state
+          cleanupGameState(roomId);
+        }, RECONNECTION_GRACE_PERIOD);
+
+        // Store timer so it can be cancelled if player reconnects
+        gameState.disconnectionTimers.set(userId, disconnectionTimer);
       }
     }
   });
