@@ -91,7 +91,7 @@ export function registerGameHandlers(io: Server, socket: Socket) {
 
           // Broadcast game started to all players in game room
           io.to(`game-${roomCode}`).emit("gameStarted", {
-            deck: cards.map((_, index) => `card-${index}`),
+            deck: cards,
             currentTurn: game.hostId,
           });
         } else {
@@ -110,13 +110,16 @@ export function registerGameHandlers(io: Server, socket: Socket) {
 
           // Send current game state to joining/reconnecting player
           socket.emit("gameStarted", {
-            deck: gameState.cards.map((_, index) => `card-${index}`),
+            deck: gameState.cards,
             currentTurn: gameState.currentTurn,
           });
 
           // Send matched cards
           socket.emit("syncGameState", {
-            matchedCards: Array.from(gameState.matchedCards),
+            matchedCards: Array.from(gameState.matchedCards).map((idx) => ({
+              cardId: `card-${idx}`,
+              cardValue: gameState!.cards[idx],
+            })),
             currentTurn: gameState.currentTurn,
           });
         }
@@ -195,6 +198,7 @@ export function registerGameHandlers(io: Server, socket: Socket) {
 
         io.to(`game-${roomCode}`).emit("cardFlipped", {
           cardId,
+          cardValue: gameState.cards[cardIndex],  
           userId,
         });
 
