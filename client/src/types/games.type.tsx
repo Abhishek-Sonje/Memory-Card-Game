@@ -6,9 +6,10 @@ export interface Player {
 
 export interface GameCard {
   id: string;
-  emoji: string;
+  emoji?: string;
+  image?: string;
   value: number | null;
- 
+
   matched: boolean;
 }
 
@@ -20,5 +21,3 @@ export interface User {
 export interface Scores {
   [userId: string]: number;
 }
-
- 

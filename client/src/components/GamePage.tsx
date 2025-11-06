@@ -67,6 +67,8 @@ export default function GamePage({
   const gameLogic = useGameLogic({
     isConnected,
     emitFlipCard: (cardId: string) => emitFlipCardRef.current(cardId),
+    currentUserId: userId,
+    useImages:true,
   });
 
   // Player Management - simplified for in-game state
@@ -146,6 +148,21 @@ export default function GamePage({
   const isMyTurn = gameLogic.currentTurn === userId;
   const isHost = gameData?.hostId === userId;
 
+  if (gameLogic.useImages && gameLogic.imagesLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900">
+        <div className="text-white text-2xl mb-4">Loading images...</div>
+        <div className="w-64 bg-gray-700 rounded-full h-4 overflow-hidden">
+          <div
+            className="bg-emerald-500 h-4 rounded-full transition-all duration-300"
+            style={{ width: `${gameLogic.imageProgress}%` }}
+          />
+        </div>
+        <div className="text-gray-400 text-sm mt-2">{gameLogic.imageProgress}%</div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-black text-white flex items-center justify-center">
@@ -196,6 +213,7 @@ export default function GamePage({
             roomCode={roomId}
             isMyTurn={isMyTurn}
             cards={gameLogic.cards}
+            useImages={gameLogic.useImages}
             flippedIds={gameLogic.flippedIds}
             onFlip={gameLogic.handleCardFlip}
             disabled={

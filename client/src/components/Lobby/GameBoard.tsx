@@ -3,6 +3,7 @@
 import React from "react";
 import Card from "@/game/Card";
 import { GameCard } from "@/types/games.type";
+import { useGameLogic } from "@/hooks/useGameLogic";
 
 type Props = {
   waitingForPlayers: boolean;
@@ -10,6 +11,7 @@ type Props = {
   roomCode: string;
   isMyTurn: boolean;
   cards: GameCard[];
+  useImages: boolean;
   flippedIds: string[];
   onFlip: (id: string) => void;
   disabled: boolean;
@@ -21,6 +23,7 @@ function GameBoard({
   roomCode,
   isMyTurn, //this
   cards,
+  useImages, //this
   flippedIds, //this
   onFlip,
   disabled,
@@ -58,10 +61,12 @@ function GameBoard({
                 key={card.id}
                 id={card.id}
                 emoji={card.emoji}
+                image={card.image} // Add this
                 isFlipped={flippedIds.includes(card.id)}
                 isMatched={card.matched}
                 onFlip={onFlip}
                 disabled={disabled}
+                useImages={useImages} // Make sure this is passed
               />
             ))}
           </div>
