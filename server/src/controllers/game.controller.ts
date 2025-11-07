@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
 import { db } from "../lib/db.js";
-import { games } from "@memory-game/shared";
-import { and,eq, or } from "drizzle-orm";
+import { games, leaderboard, users } from "@memory-game/shared";
+import { and, eq, or } from "drizzle-orm";
 import { generateRoomId } from "../utils/helpers.js";
 
 export const createGame = async (req: Request, res: Response) => {
@@ -95,5 +95,25 @@ export const updateGame = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Error updating game:", error);
     res.status(500).json({ error: "Failed to update game" });
+  }
+};
+
+export const getLeaderboard = async (req: Request, res: Response) => {
+  try {
+    const leaderboardData = await db
+      .select({
+        id: leaderboard.id,
+        userId: leaderboard.userId,
+        userName: users.name,
+        totalGamesPlayed: leaderboard.totalGamesPlayed,
+        totalWins: leaderboard.totalWins,
+        totalScore: leaderboard.totalScore,
+      })
+      .from(leaderboard)
+      .innerJoin(users, eq(leaderboard.userId, users.id));;
+    res.json({ leaderboard: leaderboardData });
+  } catch (error) {
+    console.error("Error fetching leaderboard:", error);
+    res.status(500).json({ error: "Failed to get leaderboard" });
   }
 };

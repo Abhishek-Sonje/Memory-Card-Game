@@ -1,14 +1,13 @@
-import Leaderboard from "@/components/leadboard";
-
-
+import Leaderboard from "@/components/leadboardTable";
 
 const LeaderboardPage = async () => {
-  const response = await fetch(`${process.env.NEXT_PUBLIC_SOCKET_URL}/leaderboard`);
+  console.log(process.env.NEXT_PUBLIC_SOCKET_URL);
+  const response = await fetch(`${process.env.NEXT_PUBLIC_SOCKET_URL}/api/leaderboard`);
   const data = await response.json();
   console.log("Leaderboard data:", data);
   return (
     <div>
-      <h1>Leaderboard</h1>
+  
       <Leaderboard data={data.leaderboard} />
     </div>
   );

@@ -4,6 +4,7 @@ import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useSocket } from "@/hooks/useSocket";
+import { Button } from "./UI/button";
 
 type Player = {
   id: string;
@@ -21,18 +22,36 @@ type GameData = {
 };
 
 export default function LobbyPage({
-  params,
+  initialGameInfo,
+  roomId,
 }: {
-  params: Promise<{ roomId: string }>;
+  initialGameInfo: GameData | null;
+  roomId: string;
 }) {
-  const { roomId } = use(params);
+  // const { roomId } = use(params);
   const { data: session } = useSession();
   const router = useRouter();
+
+  // Set initial game data
+  // if (initialGameInfo === null) {
+  //   return (
+  //     <div>
+  //       <h1>Game Not Found</h1>
+  //       <Button onClick={() => router.push("/")}>Go Home</Button>
+  //     </div>
+  //   )
+  //  }
+  // useEffect(() => {
+  //   if (initialGameInfo) {
+  //     setGameData(initialGameInfo);
+  //     }
+  // }, [initialGameInfo]);
+
   const { socket, isConnected } = useSocket();
 
-  const [gameData, setGameData] = useState<GameData | null>(null);
+  const [gameData, setGameData] = useState<GameData | null>(initialGameInfo);
   const [players, setPlayers] = useState<Player[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isReady, setIsReady] = useState(false);
 
@@ -40,29 +59,32 @@ export default function LobbyPage({
   const userName = session?.user?.name || "Guest";
   const isHost = gameData?.hostId === userId;
 
+  
   // Fetch initial game data
-  useEffect(() => {
-    const fetchGameData = async () => {
-      try {
-        const response = await fetch(process.env.NEXT_PUBLIC_SOCKET_URL + `/api/${roomId}/game`);
-        if (!response.ok) {
-          console.error("Game not foundddd");
-          router.push("/"); // Game not found, redirect home
-          return;
-        }
-        const data = await response.json();
-        setGameData(data.game);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error fetching game:", error);
-        router.push("/");
-      }
-    };
 
-    fetchGameData();
-  }, [roomId, router]);
+  // useEffect(() => {
+  //   const fetchGameData = async () => {
+  //     try {
+  //       const response = await fetch(process.env.NEXT_PUBLIC_SOCKET_URL + `/api/${roomId}/game`);
+  //       if (!response.ok) {
+  //         console.error("Game not foundddd");
+  //         router.push("/"); // Game not found, redirect home
+  //         return;
+  //       }
+  //       const data = await response.json();
+  //       setGameData(data.game);
+  //       setLoading(false);
+  //     } catch (error) {
+  //       console.error("Error fetching game:", error);
+  //       router.push("/");
+  //     }
+  //   };
+
+  //   fetchGameData();
+  // }, [roomId, router]);
 
   // Socket.IO: Join lobby room
+
   useEffect(() => {
     if (!socket || !isConnected || !gameData) return;
 

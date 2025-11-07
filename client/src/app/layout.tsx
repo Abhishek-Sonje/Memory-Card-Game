@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
-import { Rubik_Iso, Zain, Poppins } from "next/font/google";
+import { Rubik_Iso, Zain, Poppins ,Lobster} from "next/font/google";
 import "./globals.css";
 import { SocketProvider } from "../context/SocketProvider"
 
@@ -11,6 +11,13 @@ const rubikIso = Rubik_Iso({
   weight: "400", // Rubik Iso comes in 400 weight
   variable: "--font-rubik-iso",
   display: "swap",
+});
+
+const lobster = Lobster({
+   subsets:["latin"],
+   weight: "400",
+   variable: "--font-lobster",
+   display: "swap",
 });
 
 const zain = Zain({
@@ -51,7 +58,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${rubikIso.variable} ${zain.variable} antialiased`}>
+      <body className={`${rubikIso.variable} ${zain.variable} ${lobster.variable} antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
