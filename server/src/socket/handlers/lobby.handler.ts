@@ -138,6 +138,18 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
         if (lobby) {
           lobby.players.delete(userId);
 
+          const game = await db.query.games.findFirst({
+            where: eq(games.roomId, roomId),
+          });
+
+          if (game && game.opponentId === userId) {
+            await db
+              .update(games)
+              .set({ opponentId: null })
+              .where(eq(games.id, game.id));
+            console.log("Cleared opponentId from database");
+          }
+
           // Broadcast updated player list
           const playersList = Array.from(lobby.players.values());
           io.to(`lobby-${roomId}`).emit("lobbyUpdate", {
@@ -243,6 +255,39 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
     } catch (error) {
       console.error("Error starting game:", error);
       socket.emit("error", "Failed to start game");
+    }
+  });
+
+  socket.on("cancelGame", async ({ roomId }: { roomId: string }) => {
+    try {
+      console.log(`Cancelling game for room ${roomId}`);
+
+      const game = await db.query.games.findFirst({
+        where: eq(games.roomId, roomId),
+      });
+
+      if (!game) {
+        return socket.emit("error", "Game not found");
+      }
+
+      // ✅ UPDATE GAME STATUS TO 'cancelled' IN DATABASE
+      await db.delete(games).where(eq(games.id, game.id));
+
+      console.log(`✅ Game ${roomId} deleted from database`);
+
+      // Notify lobby that game is cancelled
+      io.to(`lobby-${roomId}`).emit("gameCancelled", {
+        status: "cancelled",
+        roomId,
+      });
+
+      // Clean up lobby state
+      cleanupLobbyState(roomId);
+
+      console.log(`Game ${roomId} cancelled successfully`);
+    } catch (error) {
+      console.error("Error cancelling game:", error);
+      socket.emit("error", "Failed to cancel game");
     }
   });
 }

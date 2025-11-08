@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SessionProvider } from "next-auth/react";
 import { ThemeProvider } from "next-themes";
-import { Rubik_Iso, Zain, Poppins ,Lobster} from "next/font/google";
+import { Rubik_Iso, Zain, Poppins, Lobster } from "next/font/google";
 import "./globals.css";
-import { SocketProvider } from "../context/SocketProvider"
+import { SocketProvider } from "../context/SocketProvider";
+import { Toaster } from "react-hot-toast";
 
 const rubikIso = Rubik_Iso({
   subsets: ["latin"],
@@ -14,10 +15,10 @@ const rubikIso = Rubik_Iso({
 });
 
 const lobster = Lobster({
-   subsets:["latin"],
-   weight: "400",
-   variable: "--font-lobster",
-   display: "swap",
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-lobster",
+  display: "swap",
 });
 
 const zain = Zain({
@@ -58,7 +59,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${rubikIso.variable} ${zain.variable} ${lobster.variable} antialiased`}>
+      <body
+        className={`${rubikIso.variable} ${zain.variable} ${lobster.variable} antialiased`}
+      >
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
@@ -66,7 +69,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <SessionProvider>
-            <SocketProvider>{children}</SocketProvider>
+            <SocketProvider>
+              {children}
+              <Toaster />
+            </SocketProvider>
           </SessionProvider>
         </ThemeProvider>
       </body>
