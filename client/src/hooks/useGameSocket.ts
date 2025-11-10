@@ -14,6 +14,7 @@ interface UseGameSocketProps {
   onCardsMismatch: (cardIds: string[]) => void;
   onTurnChanged: (userId: string) => void;
   onGameOver: (winner: { name: string; score: number }) => void;
+  setWaiting?: (waiting: boolean) => void;
 }
 
 export const useGameSocket = ({
@@ -29,6 +30,7 @@ export const useGameSocket = ({
   onCardsMismatch,
   onTurnChanged,
   onGameOver,
+
 }: UseGameSocketProps) => {
   const { socket, isConnected, isAuthenticated } = useSocket();
 
@@ -51,6 +53,15 @@ export const useGameSocket = ({
       onPlayerJoined(data);
     });
 
+     socket.on("waitingForOpponent", (data) => {
+       console.log("⏳ Waiting for opponent...", data.message);
+       // Could show a loading state or retry after a delay
+       setWaiting(true);
+       setTimeout(() => {
+         socket.emit("joinGame", { roomCode, userId: currentUserId, userName: currentUserName });
+       }, 1000); // Retry after 1 second
+     });
+
     socket.on("playerLeft", (data: { userId: string }) => {
       console.log("👋 Player left:", data.userId);
       onPlayerLeft(data.userId);
@@ -60,6 +71,8 @@ export const useGameSocket = ({
       console.log("✓ Player ready:", data);
       onPlayerReady(data.userId, data.ready);
     });
+
+   
 
     socket.on(
       "gameStarted",
@@ -161,6 +174,7 @@ export const useGameSocket = ({
     onCardsMismatch,
     onTurnChanged,
     onGameOver,
+    
   ]);
 
   // Action methods

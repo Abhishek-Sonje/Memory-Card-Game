@@ -4,13 +4,14 @@ import React, { useEffect, useRef, useState, use } from "react";
 import { useGameSocket } from "../hooks/useGameSocket";
 import { useGameLogic } from "../hooks/useGameLogic";
 import { usePlayerManagement } from "../hooks/usePlayerManagement";
-import MobileDrawer from "./Lobby/MobileDrawer";
-import GameBoard from "./Lobby/GameBoard";
-import SidePanel from "./Lobby/SidePanel";
-import Header from "./Lobby/Header";
+import MobileDrawer from "./Game/MobileDrawer";
+import GameBoard from "./Game/GameBoard";
+import SidePanel from "./Game/SidePanel";
+import Header from "./Game/Header";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "../hooks/useSocket";
+import Loader from "./UI/Loader";
 
 export default function GamePage({
   params,
@@ -99,6 +100,16 @@ export default function GamePage({
         router.push("/");
       }, 3000);
     },
+    setWaiting: (waiting: boolean) => {
+      // Could set a loading state here if needed
+      console.log("Waiting for opponent:", waiting);
+      return (
+        <div>
+          <Loader message="Waiting for opponent..." />
+        </div>
+      )
+    }
+    
   });
 
   // Update refs when socket actions are ready

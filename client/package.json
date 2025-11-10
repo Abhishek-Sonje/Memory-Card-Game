@@ -30,6 +30,7 @@
     "react-dom": "19.2.0",
     "react-hot-toast": "^2.6.0",
     "socket.io-client": "^4.8.1",
+    "styled-components": "^6.1.19",
     "tailwind-merge": "^3.3.1",
     "three": "^0.180.0"
   },

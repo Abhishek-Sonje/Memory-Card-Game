@@ -1,5 +1,5 @@
 import GoHomeClientButton from "@/components/GoHomeClientButton";
-import LobbyPage from "@/components/LobbyPage";
+import LobbyPage from "@/components/Lobby/LobbyPage";
 import { Button } from "@/components/UI/button";
 import { getGameInfo } from "@/lib/game";
  
@@ -19,9 +19,12 @@ async function lobby({ params }: { params: { roomID: string } }) {
   }
 
   return (
-    <div>
-      <LobbyPage initialGameInfo={gameInfo} roomId={roomID} />
-    </div>
+     
+
+      <div>
+        <LobbyPage initialGameInfo={gameInfo} roomId={roomID} />
+      </div>
+     
   );
 }
 

@@ -257,17 +257,26 @@ export function registerLobbyHandlers(io: Server, socket: Socket) {
         (id) => id !== game.hostId
       );
 
+      if (!opponentId) {
+        console.error("❌ No opponent found in lobby");
+        return socket.emit("error", "Cannot start game - opponent not found");
+      }
+
+      console.log(`👥 Players: Host=${game.hostId}, Opponent=${opponentId}`);
+
       // ✅ UPDATE GAME STATUS TO 'in_progress' IN DATABASE
       await db
         .update(games)
         .set({
           status: "in_progress",
-          opponentId: opponentId || null, // Ensure opponentId is set
+          opponentId: opponentId, // CRITICAL: Set opponent before starting
           startedAt: new Date(),
         })
         .where(eq(games.id, game.id));
 
-      console.log(`✅ Game ${roomId} status updated to 'in_progress'`);
+      console.log(
+        `✅ Game ${roomId} status updated to 'in_progress' with opponentId: ${opponentId}`
+      );
 
       // Notify lobby that game is starting
       io.to(`lobby-${roomId}`).emit("gameStarting", {

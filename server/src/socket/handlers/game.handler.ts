@@ -53,6 +53,19 @@ socket.on(
         return socket.emit("error", "Game not in progress");
       }
 
+      // ✅ CRITICAL FIX: If opponentId is null but user isn't host, update it
+      if (!game.opponentId && game.hostId !== userId) {
+        console.log(`⚠️ OpponentId is null, updating with ${userId}`);
+        await db
+          .update(games)
+          .set({ opponentId: userId })
+          .where(eq(games.id, game.id));
+
+        // Refresh game data
+        game.opponentId = userId;
+        console.log(`✅ Updated opponentId to ${userId}`);
+      }
+
       const isHost = game.hostId === userId;
       const isOpponent = game.opponentId === userId;
 
@@ -70,7 +83,30 @@ socket.on(
       // Initialize game state if not exists
       let gameState = gameStates.get(room);
       if (!gameState) {
-        console.log(`🎲 Initializing new game state for room ${room}`);
+        console.log(
+          `🎲 Checking if we can initialize game state for room ${room}`
+        );
+
+        // ✅ CRITICAL: Refresh game data to ensure we have latest opponentId
+        const latestGame = await db.query.games.findFirst({
+          where: eq(games.id, game.id),
+        });
+
+        if (!latestGame?.opponentId || latestGame.opponentId.trim() === "") {
+          console.log(
+            `⏳ OpponentId not set yet, sending current state to ${userId}`
+          );
+          // Don't initialize game state yet - wait for opponent to be set
+          // Just acknowledge the join
+          socket.emit("waitingForOpponent", {
+            message: "Waiting for opponent to join...",
+          });
+          return;
+        }
+
+        console.log(
+          `✅ Both players confirmed - Host: ${latestGame.hostId}, Opponent: ${latestGame.opponentId}`
+        );
 
         // Fetch or create players
         let gamePlayers = await db.query.players.findMany({
@@ -79,14 +115,20 @@ socket.on(
 
         if (gamePlayers.length === 0) {
           console.log(`👥 Creating players for game ${game.id}`);
+          console.log(
+            `📝 Inserting players - Host: ${latestGame.hostId}, Opponent: ${latestGame.opponentId}`
+          );
+
           // Create players if they don't exist
           gamePlayers = await db
             .insert(players)
             .values([
-              { gameId: game.id, userId: game.hostId, score: 0 },
-              { gameId: game.id, userId: game.opponentId!, score: 0 },
+              { gameId: game.id, userId: latestGame.hostId, score: 0 },
+              { gameId: game.id, userId: latestGame.opponentId, score: 0 },
             ])
             .returning();
+
+          console.log(`✅ Players created successfully`);
         }
 
         const hostPlayer = gamePlayers.find((p) => p.userId === game.hostId);
@@ -161,7 +203,18 @@ socket.on(
       console.log(`✅ Player ${userName} successfully joined game ${room}`);
     } catch (error) {
       console.error("❌ Error joining game:", error);
-      socket.emit("error", "Failed to join game");
+      console.error("❌ Full error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        userId,
+        room: roomId || roomCode,
+      });
+      socket.emit(
+        "error",
+        `Failed to join game: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
     }
   }
 );
