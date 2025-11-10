@@ -8,129 +8,163 @@ import { GAME_CONSTANTS } from "../../config/constants.js";
 
 export function registerGameHandlers(io: Server, socket: Socket) {
   // Join game room (after lobby)
-  socket.on(
-    "joinGame",
-    async ({
-      roomCode,
-      userId,
-      userName,
-    }: {
-      roomCode: string;
-      userId: string;
-      userName: string;
-    }) => {
-      try {
-        console.log(`User ${userName} joining game ${roomCode}`);
+socket.on(
+  "joinGame",
+  async ({
+    roomId,
+    roomCode,
+    userId,
+    userName,
+  }: {
+    roomId?: string;
+    roomCode?: string;
+    userId: string;
+    userName: string;
+  }) => {
+    try {
+      // ✅ Accept both roomId and roomCode for compatibility
+      const room = roomId || roomCode;
 
-        const game = await db.query.games.findFirst({
-          where: eq(games.roomId, roomCode),
+      if (!room) {
+        return socket.emit("error", "Room ID is required");
+      }
+
+      console.log(`🎮 User ${userName} (${userId}) joining game ${room}`);
+
+      const game = await db.query.games.findFirst({
+        where: eq(games.roomId, room),
+      });
+
+      if (!game) {
+        console.error(`❌ Game not found for room: ${room}`);
+        return socket.emit("error", "Game not found");
+      }
+
+      console.log(`📊 Game found:`, {
+        gameId: game.id,
+        hostId: game.hostId,
+        opponentId: game.opponentId,
+        status: game.status,
+        requestingUserId: userId,
+      });
+
+      if (game.status !== "in_progress") {
+        console.error(`❌ Game status is ${game.status}, not in_progress`);
+        return socket.emit("error", "Game not in progress");
+      }
+
+      const isHost = game.hostId === userId;
+      const isOpponent = game.opponentId === userId;
+
+      // Verify user is part of this game
+      if (!isHost && !isOpponent) {
+        console.error(
+          `❌ User ${userId} not authorized. Host: ${game.hostId}, Opponent: ${game.opponentId}`
+        );
+        return socket.emit("error", "You are not part of this game");
+      }
+
+      socket.join(`game-${room}`);
+      console.log(`✅ User ${userId} joined game room: game-${room}`);
+
+      // Initialize game state if not exists
+      let gameState = gameStates.get(room);
+      if (!gameState) {
+        console.log(`🎲 Initializing new game state for room ${room}`);
+
+        // Fetch or create players
+        let gamePlayers = await db.query.players.findMany({
+          where: eq(players.gameId, game.id),
         });
 
-        if (!game) {
-          return socket.emit("error", "Game not found");
+        if (gamePlayers.length === 0) {
+          console.log(`👥 Creating players for game ${game.id}`);
+          // Create players if they don't exist
+          gamePlayers = await db
+            .insert(players)
+            .values([
+              { gameId: game.id, userId: game.hostId, score: 0 },
+              { gameId: game.id, userId: game.opponentId!, score: 0 },
+            ])
+            .returning();
         }
 
-        if (game.status !== "in_progress") {
-          return socket.emit("error", "Game not in progress");
+        const hostPlayer = gamePlayers.find((p) => p.userId === game.hostId);
+        const opponentPlayer = gamePlayers.find(
+          (p) => p.userId === game.opponentId
+        );
+
+        if (!hostPlayer || !opponentPlayer) {
+          console.error(
+            `❌ Failed to find players. Host: ${!!hostPlayer}, Opponent: ${!!opponentPlayer}`
+          );
+          return socket.emit("error", "Failed to initialize players");
         }
 
-        // Verify user is part of this game
-        if (userId !== game.hostId && userId !== game.opponentId) {
-          return socket.emit("error", "You are not part of this game");
-        }
+        const cards = generateCards();
+        gameState = {
+          gameId: game.id,
+          cards,
+          currentTurn: game.hostId,
+          flippedCards: [],
+          matchedCards: new Set(),
+          hostId: game.hostId,
+          opponentId: game.opponentId!,
+          hostPlayerId: hostPlayer.id,
+          opponentPlayerId: opponentPlayer.id,
+          isProcessing: false,
+          disconnectionTimers: new Map(),
+        };
 
-        socket.join(`game-${roomCode}`);
-        console.log(`✅ User ${userId} joined game room: game-${roomCode}`);
+        gameStates.set(room, gameState);
 
-        // Initialize game state if not exists
-        let gameState = gameStates.get(roomCode);
-        if (!gameState) {
-          // Fetch or create players
-          let gamePlayers = await db.query.players.findMany({
-            where: eq(players.gameId, game.id),
-          });
+        console.log(`✅ Initialized game state for room ${room}`);
 
-          if (gamePlayers.length === 0) {
-            // Create players if they don't exist
-            gamePlayers = await db
-              .insert(players)
-              .values([
-                { gameId: game.id, userId: game.hostId, score: 0 },
-                { gameId: game.id, userId: game.opponentId!, score: 0 },
-              ])
-              .returning();
-          }
+        // Broadcast game started to all players in game room
+        io.to(`game-${room}`).emit("gameStarted", {
+          deck: cards,
+          currentTurn: game.hostId,
+        });
+      } else {
+        console.log(`♻️ Game state already exists for room ${room}`);
 
-          const hostPlayer = gamePlayers.find((p) => p.userId === game.hostId);
-          const opponentPlayer = gamePlayers.find(
-            (p) => p.userId === game.opponentId
+        // ✅ HANDLE RECONNECTION - Clear disconnection timer
+        const timer = gameState.disconnectionTimers.get(userId);
+        if (timer) {
+          clearTimeout(timer);
+          gameState.disconnectionTimers.delete(userId);
+          console.log(
+            `✅ User ${userId} reconnected, cleared disconnect timer`
           );
 
-          if (!hostPlayer || !opponentPlayer) {
-            return socket.emit("error", "Failed to initialize players");
-          }
-
-          const cards = generateCards();
-          gameState = {
-            gameId: game.id,
-            cards,
-            currentTurn: game.hostId,
-            flippedCards: [],
-            matchedCards: new Set(),
-            hostId: game.hostId,
-            opponentId: game.opponentId!,
-            hostPlayerId: hostPlayer.id,
-            opponentPlayerId: opponentPlayer.id,
-            isProcessing: false,
-            disconnectionTimers: new Map(),
-          };
-
-          gameStates.set(roomCode, gameState);
-
-          console.log(`✅ Initialized game state for room ${roomCode}`);
-
-          // Broadcast game started to all players in game room
-          io.to(`game-${roomCode}`).emit("gameStarted", {
-            deck: cards,
-            currentTurn: game.hostId,
-          });
-        } else {
-          // ✅ HANDLE RECONNECTION - Clear disconnection timer
-          const timer = gameState.disconnectionTimers.get(userId);
-          if (timer) {
-            clearTimeout(timer);
-            gameState.disconnectionTimers.delete(userId);
-            console.log(
-              `✅ User ${userId} reconnected, cleared disconnect timer`
-            );
-
-            // Notify other player
-            io.to(`game-${roomCode}`).emit("opponentReconnected", { userId });
-          }
-
-          // Send current game state to joining/reconnecting player
-          socket.emit("gameStarted", {
-            deck: gameState.cards,
-            currentTurn: gameState.currentTurn,
-          });
-
-          // Send matched cards
-          socket.emit("syncGameState", {
-            matchedCards: Array.from(gameState.matchedCards).map((idx) => ({
-              cardId: `card-${idx}`,
-              cardValue: gameState!.cards[idx],
-            })),
-            currentTurn: gameState.currentTurn,
-          });
+          // Notify other player
+          io.to(`game-${room}`).emit("opponentReconnected", { userId });
         }
 
-        console.log(`Player ${userName} joined game ${roomCode}`);
-      } catch (error) {
-        console.error("Error joining game:", error);
-        socket.emit("error", "Failed to join game");
+        // Send current game state to joining/reconnecting player
+        console.log(`📤 Sending current game state to ${userId}`);
+        socket.emit("gameStarted", {
+          deck: gameState.cards,
+          currentTurn: gameState.currentTurn,
+        });
+
+        // Send matched cards
+        socket.emit("syncGameState", {
+          matchedCards: Array.from(gameState.matchedCards).map((idx) => ({
+            cardId: `card-${idx}`,
+            cardValue: gameState!.cards[idx],
+          })),
+          currentTurn: gameState.currentTurn,
+        });
       }
+
+      console.log(`✅ Player ${userName} successfully joined game ${room}`);
+    } catch (error) {
+      console.error("❌ Error joining game:", error);
+      socket.emit("error", "Failed to join game");
     }
-  );
+  }
+);
 
   // Flip card
   socket.on(
