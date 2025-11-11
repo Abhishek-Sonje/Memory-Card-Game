@@ -131,14 +131,23 @@ socket.on(
           console.log(`✅ Players created successfully`);
         }
 
-        const hostPlayer = gamePlayers.find((p) => p.userId === game.hostId);
+        const hostPlayer = gamePlayers.find(
+          (p) => p.userId === latestGame.hostId
+        );
         const opponentPlayer = gamePlayers.find(
-          (p) => p.userId === game.opponentId
+          (p) => p.userId === latestGame.opponentId
         );
 
         if (!hostPlayer || !opponentPlayer) {
           console.error(
             `❌ Failed to find players. Host: ${!!hostPlayer}, Opponent: ${!!opponentPlayer}`
+          );
+          console.error(
+            `❌ Looking for hostId: ${latestGame.hostId}, opponentId: ${latestGame.opponentId}`
+          );
+          console.error(
+            `❌ Found players:`,
+            gamePlayers.map((p) => ({ id: p.id, userId: p.userId }))
           );
           return socket.emit("error", "Failed to initialize players");
         }
@@ -147,11 +156,11 @@ socket.on(
         gameState = {
           gameId: game.id,
           cards,
-          currentTurn: game.hostId,
+          currentTurn: latestGame.hostId,
           flippedCards: [],
           matchedCards: new Set(),
-          hostId: game.hostId,
-          opponentId: game.opponentId!,
+          hostId: latestGame.hostId,
+          opponentId: latestGame.opponentId,
           hostPlayerId: hostPlayer.id,
           opponentPlayerId: opponentPlayer.id,
           isProcessing: false,

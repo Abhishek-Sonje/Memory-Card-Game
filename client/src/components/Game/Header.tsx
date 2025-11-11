@@ -20,11 +20,11 @@ onToggleDrawer,
   isDrawerOpen,
 }: props) {
   return (
-    <header className="p-4 border-b border-gray-800 backdrop-blur-sm bg-black/40">
+    <header className="p-4 border border-[#23f9b23f] mx-3 mt-3 rounded-4xl backdrop-blur-2xl">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-bold  text-white">Memique</h1>
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-gray-800/80 rounded-lg border border-gray-700">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-[#0B1F1A] rounded-lg border border-gray-700">
             <span className="text-gray-400 text-sm">Room:</span>
             <span className="text-white font-mono font-semibold">
               {roomCode}

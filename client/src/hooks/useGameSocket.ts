@@ -30,6 +30,7 @@ export const useGameSocket = ({
   onCardsMismatch,
   onTurnChanged,
   onGameOver,
+  setWaiting,
 
 }: UseGameSocketProps) => {
   const { socket, isConnected, isAuthenticated } = useSocket();
@@ -56,7 +57,7 @@ export const useGameSocket = ({
      socket.on("waitingForOpponent", (data) => {
        console.log("⏳ Waiting for opponent...", data.message);
        // Could show a loading state or retry after a delay
-       setWaiting(true);
+       setWaiting && setWaiting(true);
        setTimeout(() => {
          socket.emit("joinGame", { roomCode, userId: currentUserId, userName: currentUserName });
        }, 1000); // Retry after 1 second

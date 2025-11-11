@@ -25,7 +25,8 @@ function SidePanel({
     gameStarted,
 }: any) {
   return (
-    <aside className="hidden lg:block w-80 bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-800 p-6 space-y-6">
+    // <aside className="hidden lg:block w-80 bg-gray-900/60 backdrop-blur-sm rounded-xl border border-gray-800 p-6 space-y-6">
+      <aside className="bg-gradient-to-br from-[#0e0e0e] to-[#1a1a1a] border border-[#23f9b2]/10 rounded-2xl shadow-[0_0_25px_-10px_rgba(35,249,178,0.3)] hidden lg:block w-80 p-6 space-y-6 h-80"> 
       <div>
         <h2 className="text-white text-xl font-semibold mb-4">Players</h2>
         <div className="space-y-3">

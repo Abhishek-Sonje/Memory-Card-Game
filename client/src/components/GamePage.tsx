@@ -161,15 +161,19 @@ export default function GamePage({
 
   if (gameLogic.useImages && gameLogic.imagesLoading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-900">
-        <div className="text-white text-2xl mb-4">Loading images...</div>
-        <div className="w-64 bg-gray-700 rounded-full h-4 overflow-hidden">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0e0e0e]">
+        <div className="text-[#23f9b2] text-2xl mb-4 animate-pulse">
+          Loading images...
+        </div>
+        <div className="w-64 bg-[#1a1a1a] rounded-full h-4 overflow-hidden border border-[#23f9b2]/30">
           <div
-            className="bg-emerald-500 h-4 rounded-full transition-all duration-300"
+            className="bg-gradient-to-r from-[#00ff87] to-[#23f9b2] h-4 rounded-full transition-all duration-300 shadow-[0_0_20px_-5px_rgba(35,249,178,0.4)]"
             style={{ width: `${gameLogic.imageProgress}%` }}
           />
         </div>
-        <div className="text-gray-400 text-sm mt-2">{gameLogic.imageProgress}%</div>
+        <div className="text-[#60efff]/80 text-sm mt-2">
+          {gameLogic.imageProgress}%
+        </div>
       </div>
     );
   }
@@ -191,18 +195,26 @@ export default function GamePage({
   }
 
   return (
-    <div className="min-h-screen w-full bg-black relative">
-      {/* Striped Dark Background */}
+    // <div className="min-h-screen w-full bg-black relative">
+    <div className="min-h-screen w-full bg-black relative overflow-hidden">
+      {/* Neon Grid Background */}
       <div
-        className="absolute inset-0 z-0"
+        className="absolute inset-0 z-0 animate-gridMove"
         style={{
-          background:
-            "repeating-linear-gradient(45deg, #000 0px, #111 2px, #000 4px, #222 6px)",
+          background: "#000000",
+          backgroundImage: `
+            linear-gradient(to right, rgba(75, 85, 99, 0.4) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(75, 85, 99, 0.4) 1px, transparent 1px)
+          `,
+          backgroundSize: "45px 45px",
         }}
       />
-
+      {/* Ambient Glow Overlay */}
+      <div className="absolute inset-0 pointer-events-none opacity-20 ">
+        <div className="absolute top-1/3 left-1/4 w-96 h-96  bg-[#00ff87] blur-[180px]  rounded-full" />
+        <div className="absolute bottom-1/3 right-1/4 w-96 h-96  bg-[#60efff] blur-[180px] rounded-full" />
+      </div>
       <div className="absolute inset-0 z-10 pointer-events-none" />
-
       {/* Main Content */}
       <div className="relative z-50 min-h-screen flex flex-col">
         {/* Header */}
@@ -217,6 +229,7 @@ export default function GamePage({
 
         {/* Main Game Area */}
         <div className="flex-1 flex flex-col lg:flex-row max-w-7xl mx-auto w-full p-4 gap-6">
+          {/* <div className="bg-gradient-to-br from-[#0e0e0e] to-[#1a1a1a] border border-[#23f9b2]/10 rounded-2xl shadow-[0_0_25px_-10px_rgba(35,249,178,0.3)] p-4"> */}
           {/* Game Board */}
           <GameBoard
             waitingForPlayers={false}
@@ -251,27 +264,29 @@ export default function GamePage({
         {gameLogic.gameStarted && (
           <div className="fixed bottom-8 left-1/2 transform -translate-x-1/2 z-50">
             <div
-              className={`px-6 py-3 rounded-full font-semibold text-lg transition-all ${
+              className={`px-6 py-3 rounded-full font-semibold text-lg transition-all shadow-[0_0_20px_-5px_rgba(35,249,178,0.4)] ${
                 isMyTurn
-                  ? "bg-green-600 text-white animate-pulse"
-                  : "bg-gray-700 text-gray-300"
+                  ? "bg-gradient-to-r from-[#00ff87] to-[#23f9b2] text-black animate-pulse"
+                  : "bg-[#1a1a1a] text-[#60efff]/70 border border-[#60efff]/30"
               }`}
             >
               {isMyTurn ? "Your Turn!" : "Opponent's Turn"}
             </div>
           </div>
         )}
-
         {/* Connection Status */}
         {!isConnected && (
           <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50">
-            <div className="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold">
-              ⚠️ Disconnected - Trying to reconnect...
+            <div className="bg-[#1a1a1a] border border-[#60efff]/40 text-[#60efff] px-6 py-3 rounded-lg font-semibold shadow-[0_0_15px_-5px_rgba(96,239,255,0.4)] animate-pulse">
+              ⚠️ Disconnected — attempting to reconnect...
             </div>
           </div>
         )}
       </div>
-
+      {/* <div className="absolute inset-0 z-0 pointer-events-none opacity-30">
+        <div className="absolute top-1/3 left-1/4 w-96 h-96 bg-[#00ff87] blur-[180px] rounded-full" />
+        <div className="absolute bottom-1/3 right-1/4 w-96 h-96 bg-[#60efff] blur-[180px] rounded-full" />
+      </div> */}
       {/* Mobile Drawer - No ready/start game controls */}
       <MobileDrawer
         isOpen={isDrawerOpen}
