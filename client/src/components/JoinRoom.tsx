@@ -13,7 +13,7 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 export default function JoinRoomModal() {
-  const { socket, isConnected } = useSocket();
+  const { socket, status } = useSocket();
   const [roomId, setRoomId] = useState("");
   const [isJoining, setIsJoining] = useState(false);
   const [error, setError] = useState("");
@@ -68,7 +68,7 @@ export default function JoinRoomModal() {
       return;
     }
 
-    if (!socket || !isConnected) {
+    if (!socket || status !== "connected") {
       setError("Not connected to the server yet!");
       return;
     }

@@ -21,7 +21,7 @@ export default function GamePage({
   const { roomId } = use(params);
   const { data: session } = useSession();
   const router = useRouter();
-  const { isConnected } = useSocket();
+  const { status } = useSocket();
 
   const userId = session?.user?.id || "guest-id";
   const userName = session?.user?.name || "Guest";
@@ -66,7 +66,7 @@ export default function GamePage({
 
   // Game Logic - simplified without player ready emissions
   const gameLogic = useGameLogic({
-    isConnected,
+    isConnected: status === "connected",
     emitFlipCard: (cardId: string) => emitFlipCardRef.current(cardId),
     currentUserId: userId,
     useImages:true,
@@ -119,12 +119,12 @@ export default function GamePage({
 
   // Join game room when ready
   useEffect(() => {
-    if (gameData && isConnected && !hasJoinedGameRef.current) {
+    if (gameData && status === "connected" && !hasJoinedGameRef.current) {
       console.log("Joining game room:", roomId);
       socketActions.emitJoinGame();
       hasJoinedGameRef.current = true;
     }
-  }, [gameData, isConnected, roomId, socketActions]);
+  }, [gameData, status, roomId, socketActions]);
 
   // Initialize players from game data
   useEffect(() => {
@@ -275,7 +275,7 @@ export default function GamePage({
           </div>
         )}
         {/* Connection Status */}
-        {!isConnected && (
+        {status !== "connected" && (
           <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-50">
             <div className="bg-[#1a1a1a] border border-[#60efff]/40 text-[#60efff] px-6 py-3 rounded-lg font-semibold shadow-[0_0_15px_-5px_rgba(96,239,255,0.4)] animate-pulse">
               ⚠️ Disconnected — attempting to reconnect...
