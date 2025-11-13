@@ -33,14 +33,14 @@ export const useGameSocket = ({
   setWaiting,
 
 }: UseGameSocketProps) => {
-  const { socket, isConnected, isAuthenticated } = useSocket();
+  const { socket, status, isAuthenticated } = useSocket();
 
   // Set up event listeners (but DON'T emit joinRoom here)
   useEffect(() => {
-    if (!socket || !isConnected || !isAuthenticated) {
+    if (!socket || status !== "connected" || !isAuthenticated) {
       console.log("⏳ Waiting for socket connection...", {
         hasSocket: !!socket,
-        isConnected,
+        isConnected : status === "connected",
         isAuthenticated,
       });
       return;
@@ -163,7 +163,7 @@ export const useGameSocket = ({
     };
   }, [
     socket,
-    isConnected,
+    status === "connected",
     isAuthenticated,
     roomCode,
     onPlayerJoined,
@@ -180,8 +180,8 @@ export const useGameSocket = ({
 
   // Action methods
   const emitJoinGame = useCallback(() => {
-    if (!socket || !isConnected) {
-      console.warn("⚠️ Cannot join game - socket not connected");
+    if (!socket || status !== "connected" || !isAuthenticated) {
+      console.warn("⚠️ Cannot join game - socket not connected or not authenticated");
       return;
     }
     console.log("📤 Emitting joinGame:", {
@@ -194,12 +194,12 @@ export const useGameSocket = ({
       userId: currentUserId,
       userName: currentUserName,
     });
-  }, [socket, isConnected, roomCode, currentUserId, currentUserName]);
+  }, [socket, status, roomCode, currentUserId, currentUserName]);
 
   const emitFlipCard = useCallback(
     (cardId: string) => {
-      if (!socket?.connected) {
-        console.warn("⚠️ Cannot flip card - socket not connected");
+      if (!socket || status !== "connected" || !isAuthenticated) {
+        console.warn("⚠️ Cannot flip card - socket not connected or not authenticated");
         return;
       }
       console.log("📤 Emitting flipCard:", { roomCode, cardId, currentUserId });
@@ -242,7 +242,7 @@ export const useGameSocket = ({
   }, [socket, roomCode]);
 
   return {
-    isConnected,
+    isConnected: status === "connected",
     emitFlipCard,
     emitPlayerReady,
     emitStartGame,

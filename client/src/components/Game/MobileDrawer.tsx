@@ -34,7 +34,9 @@ function MobileDrawer({ isOpen, onClose, roomCode, copied, onCopy, players, onRe
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-white text-xl font-semibold">Game Info</h2>
               <button
-                onClick={onClose}
+            onClick={onClose}
+            type="button"
+            title="shut down"
                 className="p-2 hover:bg-gray-800 rounded-lg text-white"
               >
                 <X className="w-5 h-5" />

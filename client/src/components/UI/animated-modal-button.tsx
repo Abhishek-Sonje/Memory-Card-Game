@@ -198,6 +198,8 @@ const CloseIcon = () => {
   const { setOpen } = useModal();
   return (
     <button
+      type="button"
+      title="Close modal"
       onClick={() => setOpen(false)}
       className="absolute top-4 right-4 group"
     >
